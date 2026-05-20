@@ -1,25 +1,26 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AlertCircle,
   Bell,
-  Bot,
   Braces,
   CheckCircle2,
   ChevronDown,
-  Clock3,
   Clapperboard,
+  Clock3,
+  Copy,
   Download,
+  Edit3,
+  Eye,
   FileText,
   FolderOpen,
   Gauge,
   Grid3X3,
   HelpCircle,
-  ImagePlus,
   LayoutDashboard,
   LayoutTemplate,
   ListChecks,
+  Loader2,
   Mic2,
-  MoreHorizontal,
-  Pause,
   Play,
   Plus,
   RefreshCw,
@@ -27,8 +28,8 @@ import {
   Settings,
   Share2,
   ShieldCheck,
-  SlidersHorizontal,
   Sparkles,
+  Trash2,
   Upload,
   UserRound,
   Users,
@@ -49,370 +50,255 @@ const navItems = [
   { id: 'settings', label: '设置', icon: Settings },
 ];
 
-const avatars = [
-  {
-    id: 'ruyi',
-    name: '如夏',
-    gender: '女性',
-    age: '青年',
-    scene: '电商',
-    badge: '运营中',
-    image:
-      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=720&q=80',
-    outfit: '浅蓝主持装',
-  },
-  {
-    id: 'jingjing',
-    name: '静怡',
-    gender: '女性',
-    age: '青年',
-    scene: '知识',
-    image:
-      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=720&q=80',
-    outfit: '白色针织上衣',
-  },
-  {
-    id: 'siyi',
-    name: '思玥',
-    gender: '女性',
-    age: '青年',
-    scene: '金融',
-    image:
-      'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=720&q=80',
-    outfit: '粉色商务套装',
-  },
-  {
-    id: 'chunfeng',
-    name: '春辰',
-    gender: '男性',
-    age: '青年',
-    scene: '科技',
-    image:
-      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=720&q=80',
-    outfit: '深色商务西装',
-  },
-  {
-    id: 'ziyan',
-    name: '子墨',
-    gender: '男性',
-    age: '青年',
-    scene: '教育',
-    image:
-      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=720&q=80',
-    outfit: '蓝色休闲衬衫',
-  },
-  {
-    id: 'rain',
-    name: '雨桐',
-    gender: '女性',
-    age: '少女',
-    scene: '娱乐',
-    image:
-      'https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&w=720&q=80',
-    outfit: '淡粉主持装',
-  },
-  {
-    id: 'haoyu',
-    name: '浩宇',
-    gender: '男性',
-    age: '青年',
-    scene: '企业',
-    image:
-      'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=720&q=80',
-    outfit: '黑色衬衫',
-  },
-];
-
-const voices = [
-  { id: 'v1', name: '如夏 · 活力女声', lang: '普通话', tone: '活力亲切', duration: '00:15', owner: 'system' },
-  { id: 'v2', name: '静怡 · 温柔女声', lang: '普通话', tone: '温暖知性', duration: '00:15', owner: 'system' },
-  { id: 'v3', name: '思玥 · 金融主播', lang: '普通话', tone: '稳重清晰', duration: '00:15', owner: 'clone' },
-  { id: 'v4', name: '春辰 · 科技男声', lang: '普通话', tone: '沉稳专业', duration: '00:15', owner: 'system' },
-  { id: 'v5', name: '海宇 · 磁性男声', lang: '普通话', tone: '磁性大气', duration: '00:15', owner: 'clone' },
-];
-
-const templates = [
-  {
-    id: 'tpl1',
-    name: '新品上市种草',
-    category: '产品营销',
-    color: 'from-blue-500 to-cyan-400',
-    script: '这款新品把高性能与轻便体验结合在一起，适合通勤、学习和日常创作。今天下单还可享受限时优惠。',
-  },
-  {
-    id: 'tpl2',
-    name: '课程宣传片',
-    category: '教育培训',
-    color: 'from-emerald-500 to-teal-400',
-    script: '如果你想系统提升专业能力，这门课程会从基础概念讲到真实案例，帮助你快速建立完整知识框架。',
-  },
-  {
-    id: 'tpl3',
-    name: '活动邀约',
-    category: '活动促销',
-    color: 'from-orange-500 to-amber-400',
-    script: '本周五晚八点，直播间准备了专属福利和新品体验名额，欢迎预约参加，一起解锁更多实用内容。',
-  },
-];
-
-const initialTasks = [
-  {
-    id: 'T2026052001',
-    title: '618 耳机促销口播视频',
-    avatar: '如夏',
-    duration: '00:15',
-    resolution: '1080P',
-    status: 'running',
-    progress: 48,
-    createdAt: '2026-05-20 14:30',
-  },
-  {
-    id: 'T2026052002',
-    title: '新品发布会预告',
-    avatar: '春辰',
-    duration: '00:30',
-    resolution: '1080P',
-    status: 'composing',
-    progress: 72,
-    createdAt: '2026-05-20 14:20',
-  },
-  {
-    id: 'T2026052003',
-    title: '夏季护肤品推荐',
-    avatar: '静怡',
-    duration: '00:20',
-    resolution: '1080P',
-    status: 'queued',
-    progress: 22,
-    createdAt: '2026-05-20 14:10',
-  },
-  {
-    id: 'T2026051905',
-    title: '企业介绍视频',
-    avatar: '浩宇',
-    duration: '01:00',
-    resolution: '1080P',
-    status: 'done',
-    progress: 100,
-    createdAt: '2026-05-20 13:50',
-  },
-  {
-    id: 'T2026051904',
-    title: '课程宣传片',
-    avatar: '子墨',
-    duration: '00:45',
-    resolution: '720P',
-    status: 'done',
-    progress: 100,
-    createdAt: '2026-05-20 13:30',
-  },
-  {
-    id: 'T2026051903',
-    title: '活动通知',
-    avatar: '雨桐',
-    duration: '00:15',
-    resolution: '1080P',
-    status: 'failed',
-    progress: 0,
-    createdAt: '2026-05-20 13:10',
-  },
-];
-
-const initialWorks = [
-  {
-    id: 'W001',
-    title: '618 耳机促销口播视频',
-    avatar: '如夏',
-    image: avatars[0].image,
-    duration: '00:15',
-    spec: '1080P · 9:16',
-    createdAt: '2026-05-20 14:30',
-  },
-  {
-    id: 'W002',
-    title: '新品发布会预告',
-    avatar: '春辰',
-    image: avatars[3].image,
-    duration: '00:30',
-    spec: '1080P · 9:16',
-    createdAt: '2026-05-20 14:20',
-  },
-  {
-    id: 'W003',
-    title: '夏季护肤品推荐',
-    avatar: '静怡',
-    image: avatars[1].image,
-    duration: '00:20',
-    spec: '1080P · 9:16',
-    createdAt: '2026-05-20 14:10',
-  },
-  {
-    id: 'W004',
-    title: '企业介绍视频',
-    avatar: '浩宇',
-    image: avatars[6].image,
-    duration: '01:00',
-    spec: '1080P · 16:9',
-    createdAt: '2026-05-20 12:50',
-  },
-  {
-    id: 'W005',
-    title: '课程宣传片',
-    avatar: '子墨',
-    image: avatars[4].image,
-    duration: '00:45',
-    spec: '720P · 9:16',
-    createdAt: '2026-05-20 13:30',
-  },
-  {
-    id: 'W006',
-    title: '活动通知',
-    avatar: '雨桐',
-    image: avatars[5].image,
-    duration: '00:15',
-    spec: '1080P · 9:16',
-    createdAt: '2026-05-20 13:10',
-  },
-];
-
 const defaultScript =
   '大家好，欢迎来到我们的品牌直播间！今天为大家带来一款高性价比的智能耳机，它拥有超长续航、高清音质和舒适佩戴体验，无论通勤、运动还是办公，都能带给你沉浸式的使用感受。现在下单，享受限时优惠，数量有限，先到先得！';
 
+const subtitleOptions = ['关键词高亮', '清爽白字', '重点描边', '商务蓝', '新闻下三分之一'];
+const backgroundOptions = ['简约直播间', '书房背景', '企业展厅', '课堂背景', '新闻演播厅', '纯色背景'];
+const introOutroOptions = ['无片头片尾', '品牌片头 + 福利片尾', '标题片头 + 总结片尾', 'Logo 片头 + 联系方式片尾', '课程标题片头 + 报名片尾'];
+const templateCategories = ['全部', '电商口播', '知识讲解', '企业宣传', '课程讲解', '新闻播报'];
+
 const statusMap = {
-  queued: { label: '排队中', color: 'text-slate-500', bar: 'bg-slate-400' },
-  running: { label: '视频生成中', color: 'text-blue-600', bar: 'bg-blue-600' },
-  composing: { label: '合成渲染中', color: 'text-indigo-600', bar: 'bg-indigo-600' },
-  done: { label: '已完成', color: 'text-emerald-600', bar: 'bg-emerald-500' },
-  failed: { label: '失败', color: 'text-rose-600', bar: 'bg-rose-500' },
+  pending: { label: '排队中', color: 'text-slate-500', bar: 'bg-slate-400', badge: 'bg-slate-100 text-slate-600' },
+  running: { label: '生成中', color: 'text-blue-600', bar: 'bg-blue-600', badge: 'bg-blue-50 text-blue-700' },
+  success: { label: '已完成', color: 'text-emerald-600', bar: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700' },
+  failed: { label: '失败', color: 'text-rose-600', bar: 'bg-rose-500', badge: 'bg-rose-50 text-rose-700' },
+  cancelled: { label: '已取消', color: 'text-amber-600', bar: 'bg-amber-500', badge: 'bg-amber-50 text-amber-700' },
 };
+
+async function apiFetch(url, options = {}) {
+  const response = await fetch(url, options);
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : null;
+  if (!response.ok) {
+    throw new Error(data?.error || `请求失败：${response.status}`);
+  }
+  return data;
+}
+
+function formatDate(value) {
+  if (!value) return '-';
+  return new Date(value).toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
+function cnDate(value) {
+  if (!value) return '-';
+  return new Date(value).toLocaleDateString('zh-CN');
+}
+
+function hasActiveJobs(jobs) {
+  return jobs.some((job) => ['pending', 'running'].includes(job.status));
+}
 
 function App() {
   const [activeView, setActiveView] = useState('workbench');
+  const [avatars, setAvatars] = useState([]);
+  const [voices, setVoices] = useState([]);
+  const [templates, setTemplates] = useState([]);
+  const [jobs, setJobs] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [script, setScript] = useState(defaultScript);
-  const [selectedAvatar, setSelectedAvatar] = useState(avatars[0]);
-  const [selectedVoice, setSelectedVoice] = useState(voices[0]);
-  const [tasks, setTasks] = useState(initialTasks);
-  const [works, setWorks] = useState(initialWorks);
-  const [tone, setTone] = useState('热情亲切');
-  const [speed, setSpeed] = useState(1);
-  const [volume, setVolume] = useState(88);
-  const [aspect, setAspect] = useState('9:16');
-  const [toast, setToast] = useState('已加载参考 Mockup 风格的数字人口播工作台');
+  const [selectedAvatarId, setSelectedAvatarId] = useState('');
+  const [selectedVoiceId, setSelectedVoiceId] = useState('');
+  const [subtitleStyle, setSubtitleStyle] = useState('关键词高亮');
+  const [backgroundConfig, setBackgroundConfig] = useState('简约直播间');
+  const [introOutroConfig, setIntroOutroConfig] = useState('品牌片头 + 福利片尾');
+  const [toast, setToast] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState('');
+
+  async function refreshAll({ silent = false } = {}) {
+    if (!silent) setLoading(true);
+    try {
+      const [avatarData, voiceData, templateData, jobData, projectData] = await Promise.all([
+        apiFetch('/api/avatars'),
+        apiFetch('/api/voices'),
+        apiFetch('/api/templates'),
+        apiFetch('/api/jobs'),
+        apiFetch('/api/projects'),
+      ]);
+      setAvatars(avatarData);
+      setVoices(voiceData);
+      setTemplates(templateData);
+      setJobs(jobData);
+      setProjects(projectData);
+      setError('');
+
+      const defaultAvatar = avatarData.find((item) => item.isDefault) || avatarData[0];
+      const defaultVoice = voiceData.find((item) => item.isDefault) || voiceData[0];
+      setSelectedAvatarId((current) => (avatarData.some((item) => item.id === current) ? current : defaultAvatar?.id || ''));
+      setSelectedVoiceId((current) => (voiceData.some((item) => item.id === current) ? current : defaultVoice?.id || ''));
+    } catch (apiError) {
+      setError(apiError.message);
+      setToast(apiError.message);
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    refreshAll();
+  }, []);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      setTasks((current) => {
-        const completedNow = [];
-        const next = current.map((task) => {
-          if (!['queued', 'running', 'composing'].includes(task.status)) return task;
-          const step = task.status === 'queued' ? 7 : task.status === 'running' ? 11 : 8;
-          const progress = Math.min(task.progress + step, 100);
-          if (progress >= 100) {
-            completedNow.push(task);
-            return { ...task, status: 'done', progress: 100 };
-          }
-          const status = progress > 62 ? 'composing' : progress > 26 ? 'running' : 'queued';
-          return { ...task, progress, status };
-        });
-
-        if (completedNow.length) {
-          setWorks((items) => {
-            const newWorks = completedNow
-              .filter((task) => !items.some((work) => work.taskId === task.id))
-              .map((task) => ({
-                id: `W${task.id}`,
-                taskId: task.id,
-                title: task.title,
-                avatar: task.avatar,
-                image: selectedAvatar.image,
-                duration: task.duration,
-                spec: `${task.resolution} · 9:16`,
-                createdAt: task.createdAt,
-              }));
-            return newWorks.length ? [...newWorks, ...items] : items;
-          });
-        }
-
-        return next;
-      });
-    }, 1400);
-
+      if (hasActiveJobs(jobs) || jobs.length === 0) {
+        refreshAll({ silent: true });
+      } else {
+        apiFetch('/api/voices')
+          .then(setVoices)
+          .catch(() => {});
+      }
+    }, 2500);
     return () => window.clearInterval(timer);
-  }, [selectedAvatar.image]);
+  }, [jobs]);
 
   useEffect(() => {
     if (!toast) return undefined;
-    const timer = window.setTimeout(() => setToast(''), 2600);
+    const timer = window.setTimeout(() => setToast(''), 3200);
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  const runningCount = tasks.filter((task) => ['queued', 'running', 'composing'].includes(task.status)).length;
-  const completedCount = tasks.filter((task) => task.status === 'done').length;
-  const failedCount = tasks.filter((task) => task.status === 'failed').length;
+  useEffect(() => {
+    const handler = (event) => setToast(event.detail);
+    window.addEventListener('app-toast', handler);
+    return () => window.removeEventListener('app-toast', handler);
+  }, []);
 
-  function handleRewrite() {
-    const polished = `大家好，欢迎来到直播间。今天给大家重点介绍这款智能耳机：它兼顾高清音质、稳定降噪和长续航表现，通勤、运动、办公都能轻松覆盖。现在下单可享限时福利，库存有限，想提升日常听音体验的朋友可以直接入手。`;
-    setScript(polished);
-    setTone('清晰有感染力');
-    setToast('AI 已完成文案改写，并同步推荐了播报语气');
+  const selectedAvatar = avatars.find((item) => item.id === selectedAvatarId);
+  const selectedVoice = voices.find((item) => item.id === selectedVoiceId);
+
+  async function handleRewrite() {
+    if (!script.trim()) {
+      setToast('请先输入文案');
+      return;
+    }
+    setBusy('rewrite');
+    try {
+      const data = await apiFetch('/api/ai/rewrite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ script }),
+      });
+      setScript(data.script);
+      setSubtitleStyle('关键词高亮');
+      setToast('AI 已完成文案改写');
+    } catch (apiError) {
+      setToast(apiError.message);
+    } finally {
+      setBusy('');
+    }
   }
 
-  function handleGenerate() {
-    const id = `T${Date.now().toString().slice(-10)}`;
-    const title = script.slice(0, 16).replace(/[，。！？\s]/g, '') || '新建口播视频';
-    const task = {
-      id,
-      title: `${title}口播视频`,
-      avatar: selectedAvatar.name,
-      duration: script.length > 160 ? '00:45' : '00:30',
-      resolution: aspect === '9:16' ? '1080P' : '1080P',
-      status: 'queued',
-      progress: 5,
-      createdAt: new Date().toLocaleString('zh-CN', {
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      }),
-    };
-    setTasks((items) => [task, ...items]);
-    setActiveView('tasks');
-    setToast('生成任务已提交，任务中心会持续刷新进度');
+  async function handleGenerate() {
+    const text = script.trim();
+    if (!text) {
+      setToast('请输入视频文案');
+      return;
+    }
+    if (text.length > 3000) {
+      setToast('文案不能超过 3000 字');
+      return;
+    }
+    if (!selectedAvatarId) {
+      setToast('请选择数字人');
+      return;
+    }
+    if (!selectedVoiceId) {
+      setToast('请选择声音');
+      return;
+    }
+    if (selectedVoice?.status !== 'ready') {
+      setToast('当前声音还在克隆处理中，请稍后再试');
+      return;
+    }
+
+    setBusy('generate');
+    try {
+      const job = await apiFetch('/api/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          script: text,
+          avatarId: selectedAvatarId,
+          voiceId: selectedVoiceId,
+          subtitleStyle,
+          backgroundConfig,
+          introOutroConfig,
+        }),
+      });
+      setJobs((items) => [job, ...items]);
+      setActiveView('tasks');
+      setToast('生成任务已创建，任务中心会自动刷新进度');
+      refreshAll({ silent: true });
+    } catch (apiError) {
+      setToast(apiError.message);
+    } finally {
+      setBusy('');
+    }
   }
 
-  function handleQuickTemplate(template) {
-    setScript(template.script);
+  function applyTemplate(template) {
+    setScript(`请按以下结构生成口播文案：${template.scriptPrompt}\n\n开场：一句话抓住注意力。\n卖点：列出 2-3 个核心价值。\n场景：说明适合谁、什么时候使用。\n结尾：给出明确行动号召。`);
+    setSubtitleStyle(template.subtitleStyle);
+    setBackgroundConfig(template.backgroundConfig);
+    setIntroOutroConfig(template.introOutroConfig);
     setActiveView('create');
-    setToast(`已套用「${template.name}」模板，可直接预览并生成`);
+    setToast(`已套用模板「${template.name}」`);
   }
 
-  const currentPage = useMemo(() => {
+  function reuseProject(project) {
+    setScript(project.script);
+    setSelectedAvatarId(project.avatarId);
+    setSelectedVoiceId(project.voiceId);
+    setSubtitleStyle(project.job?.subtitleStyle || '关键词高亮');
+    setBackgroundConfig(project.job?.backgroundConfig || '简约直播间');
+    setIntroOutroConfig(project.job?.introOutroConfig || '品牌片头 + 福利片尾');
+    setActiveView('create');
+    setToast(`已复用作品「${project.title}」配置`);
+  }
+
+  const page = useMemo(() => {
+    const shared = {
+      avatars,
+      voices,
+      templates,
+      jobs,
+      projects,
+      refreshAll,
+      setToast,
+      setActiveView,
+    };
+
     if (activeView === 'workbench' || activeView === 'create') {
       return (
         <CreateVideoPage
+          {...shared}
           isWorkbench={activeView === 'workbench'}
           script={script}
           setScript={setScript}
+          selectedAvatarId={selectedAvatarId}
+          setSelectedAvatarId={setSelectedAvatarId}
+          selectedVoiceId={selectedVoiceId}
+          setSelectedVoiceId={setSelectedVoiceId}
           selectedAvatar={selectedAvatar}
-          setSelectedAvatar={setSelectedAvatar}
           selectedVoice={selectedVoice}
-          setSelectedVoice={setSelectedVoice}
-          tone={tone}
-          setTone={setTone}
-          speed={speed}
-          setSpeed={setSpeed}
-          volume={volume}
-          setVolume={setVolume}
-          aspect={aspect}
-          setAspect={setAspect}
+          subtitleStyle={subtitleStyle}
+          setSubtitleStyle={setSubtitleStyle}
+          backgroundConfig={backgroundConfig}
+          setBackgroundConfig={setBackgroundConfig}
+          introOutroConfig={introOutroConfig}
+          setIntroOutroConfig={setIntroOutroConfig}
+          busy={busy}
           handleRewrite={handleRewrite}
           handleGenerate={handleGenerate}
-          runningCount={runningCount}
-          completedCount={completedCount}
-          failedCount={failedCount}
-          works={works}
-          tasks={tasks}
         />
       );
     }
@@ -420,59 +306,64 @@ function App() {
     if (activeView === 'avatars' || activeView === 'voices') {
       return (
         <LibraryPage
+          {...shared}
           initialTab={activeView === 'avatars' ? 'avatars' : 'voices'}
-          selectedAvatar={selectedAvatar}
-          setSelectedAvatar={setSelectedAvatar}
-          selectedVoice={selectedVoice}
-          setSelectedVoice={setSelectedVoice}
-          setToast={setToast}
+          selectedAvatarId={selectedAvatarId}
+          setSelectedAvatarId={setSelectedAvatarId}
+          selectedVoiceId={selectedVoiceId}
+          setSelectedVoiceId={setSelectedVoiceId}
         />
       );
     }
 
     if (activeView === 'tasks') {
-      return <TaskCenterPage tasks={tasks} setTasks={setTasks} />;
+      return <TaskCenterPage {...shared} />;
     }
 
     if (activeView === 'works' || activeView === 'templates') {
       return (
         <WorksTemplatesPage
+          {...shared}
           initialTab={activeView === 'works' ? 'works' : 'templates'}
-          works={works}
-          setWorks={setWorks}
-          handleQuickTemplate={handleQuickTemplate}
+          applyTemplate={applyTemplate}
+          reuseProject={reuseProject}
         />
       );
     }
 
-    if (activeView === 'api') {
-      return <ApiPage />;
-    }
-
-    return <SettingsPage />;
+    if (activeView === 'api') return <ApiPage />;
+    return <SettingsPage setToast={setToast} />;
   }, [
     activeView,
-    aspect,
-    completedCount,
-    failedCount,
-    runningCount,
+    avatars,
+    backgroundConfig,
+    busy,
+    introOutroConfig,
+    jobs,
+    projects,
     script,
     selectedAvatar,
+    selectedAvatarId,
     selectedVoice,
-    speed,
-    tasks,
-    tone,
-    volume,
-    works,
+    selectedVoiceId,
+    subtitleStyle,
+    templates,
+    voices,
   ]);
 
   return (
     <div className="min-h-screen bg-[#f3f6fb] text-ink">
       <div className="flex min-h-screen">
-        <Sidebar activeView={activeView} setActiveView={setActiveView} />
+        <Sidebar activeView={activeView} setActiveView={setActiveView} setToast={setToast} />
         <main className="min-w-0 flex-1 px-4 py-4 sm:px-6 lg:px-8">
-          <Topbar />
-          {currentPage}
+          <Topbar setToast={setToast} />
+          {error ? (
+            <div className="mb-4 flex items-center gap-2 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+              <AlertCircle className="h-4 w-4" />
+              {error}
+            </div>
+          ) : null}
+          {loading ? <LoadingState /> : page}
         </main>
       </div>
       {toast ? (
@@ -484,14 +375,10 @@ function App() {
   );
 }
 
-function Sidebar({ activeView, setActiveView }) {
+function Sidebar({ activeView, setActiveView, setToast }) {
   return (
     <aside className="sticky top-0 block h-screen w-[76px] shrink-0 border-r border-slate-200/80 bg-white/95 px-3 py-5 shadow-[8px_0_30px_rgba(30,50,100,0.04)] lg:w-60 lg:px-4">
-      <button
-        className="mb-7 flex w-full items-center justify-center gap-3 text-left lg:justify-start"
-        type="button"
-        onClick={() => setActiveView('workbench')}
-      >
+      <button className="mb-7 flex w-full items-center justify-center gap-3 text-left lg:justify-start" type="button" onClick={() => setActiveView('workbench')}>
         <div className="relative grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-soft">
           <Users className="h-6 w-6" />
           <span className="absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-full border-2 border-white bg-cyan-400">
@@ -539,7 +426,7 @@ function Sidebar({ activeView, setActiveView }) {
             <span className="font-bold text-slate-800">12,450</span>
           </div>
         </div>
-        <button className="mt-3 w-full rounded-lg border border-blue-200 bg-white py-2 text-xs font-bold text-blue-700 shadow-sm" type="button">
+        <button className="mt-3 w-full rounded-lg border border-blue-200 bg-white py-2 text-xs font-bold text-blue-700 shadow-sm" type="button" onClick={() => setToast('充值入口已预留，可接入支付/积分系统')}>
           去充值
         </button>
       </div>
@@ -547,7 +434,7 @@ function Sidebar({ activeView, setActiveView }) {
   );
 }
 
-function Topbar() {
+function Topbar({ setToast }) {
   return (
     <header className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-white bg-white/80 px-4 py-3 shadow-soft backdrop-blur">
       <div className="min-w-0">
@@ -555,21 +442,19 @@ function Topbar() {
         <h1 className="truncate text-lg font-black text-slate-950">数字人口播 Web 工作台</h1>
       </div>
       <div className="flex items-center gap-2">
-        <button className="hidden items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 md:flex" type="button">
+        <button className="hidden items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 md:flex" type="button" onClick={() => setToast('新手教程已预留，可接入帮助文档')}>
           <HelpCircle className="h-4 w-4" />
           帮助中心
         </button>
-        <button className="hidden items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 md:flex" type="button">
+        <button className="hidden items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 md:flex" type="button" onClick={() => setToast('教程入口已记录')}>
           <FileText className="h-4 w-4" />
           新手教程
         </button>
-        <button className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-500" type="button">
+        <button className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-500" type="button" onClick={() => setToast('暂无新通知')}>
           <Bell className="h-4 w-4" />
         </button>
-        <button className="flex items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white" type="button">
-          <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-to-br from-orange-300 to-blue-300 text-xs text-slate-900">
-            N
-          </span>
+        <button className="flex items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white" type="button" onClick={() => setToast('当前账号：运营小助手')}>
+          <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-to-br from-orange-300 to-blue-300 text-xs text-slate-900">N</span>
           <span className="hidden sm:inline">运营小助手</span>
           <ChevronDown className="hidden h-4 w-4 sm:block" />
         </button>
@@ -580,38 +465,66 @@ function Topbar() {
 
 function CreateVideoPage({
   isWorkbench,
+  avatars,
+  voices,
+  jobs,
+  projects,
   script,
   setScript,
+  selectedAvatarId,
+  setSelectedAvatarId,
+  selectedVoiceId,
+  setSelectedVoiceId,
   selectedAvatar,
-  setSelectedAvatar,
   selectedVoice,
-  setSelectedVoice,
-  tone,
-  setTone,
-  speed,
-  setSpeed,
-  volume,
-  setVolume,
-  aspect,
-  setAspect,
+  subtitleStyle,
+  setSubtitleStyle,
+  backgroundConfig,
+  setBackgroundConfig,
+  introOutroConfig,
+  setIntroOutroConfig,
+  busy,
   handleRewrite,
   handleGenerate,
-  runningCount,
-  completedCount,
-  failedCount,
-  works,
-  tasks,
+  setToast,
+  setActiveView,
 }) {
-  const scriptCount = script.length;
+  const fileRef = useRef(null);
+  const activeJobs = jobs.filter((job) => ['pending', 'running'].includes(job.status));
+  const completedJobs = jobs.filter((job) => job.status === 'success');
+  const failedJobs = jobs.filter((job) => job.status === 'failed');
+
+  async function importTextFile(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    setScript(text.slice(0, 3000));
+    setToast(`已导入「${file.name}」`);
+    event.target.value = '';
+  }
+
+  async function pasteFromClipboard() {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text) {
+        setToast('剪贴板没有可导入文本');
+        return;
+      }
+      setScript(text.slice(0, 3000));
+      setToast('已从剪贴板导入文案');
+    } catch {
+      setToast('浏览器未授权读取剪贴板');
+    }
+  }
 
   return (
     <div className="space-y-4">
       {isWorkbench ? (
         <section className="grid gap-3 md:grid-cols-4">
-          <MetricCard icon={Clapperboard} label="今日生成" value="23" hint="较昨日 +15%" tone="blue" />
-          <MetricCard icon={Clock3} label="进行中" value={runningCount} hint="自动轮询进度" tone="cyan" />
-          <MetricCard icon={CheckCircle2} label="已完成" value={completedCount} hint="可下载分享" tone="green" />
-          <MetricCard icon={XCircle} label="失败任务" value={failedCount} hint="支持重试" tone="rose" />
+          <MetricCard icon={Clapperboard} label="今日生成" value={jobs.length} hint="API 实时读取" tone="blue" />
+          <MetricCard icon={Clock3} label="进行中" value={activeJobs.length} hint="自动轮询进度" tone="cyan" />
+          <MetricCard icon={CheckCircle2} label="已完成" value={completedJobs.length} hint="可下载分享" tone="green" />
+          <MetricCard icon={XCircle} label="失败任务" value={failedJobs.length} hint="支持重试" tone="rose" />
         </section>
       ) : null}
 
@@ -619,115 +532,120 @@ function CreateVideoPage({
         <div className="mb-4 flex flex-col justify-between gap-3 md:flex-row md:items-center">
           <div>
             <h2 className="text-xl font-black text-slate-950">视频生成</h2>
-            <p className="mt-1 text-sm text-slate-500">输入中文文案，选择数字人和声音，快速生成 1080x1920 竖屏口播视频。</p>
+            <p className="mt-1 text-sm text-slate-500">输入中文文案，选择数字人和声音，创建真实 generation job，完成后进入作品管理。</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-600" type="button">
+            <input ref={fileRef} className="hidden" type="file" accept=".txt,.md,.csv" onChange={importTextFile} />
+            <button className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-600" type="button" onClick={() => fileRef.current?.click()}>
               导入文档
             </button>
             <button
-              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-soft shadow-blue-200"
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-soft shadow-blue-200 disabled:cursor-not-allowed disabled:opacity-60"
               type="button"
               onClick={handleRewrite}
+              disabled={busy === 'rewrite'}
             >
-              <WandSparkles className="h-4 w-4" />
+              {busy === 'rewrite' ? <Loader2 className="h-4 w-4 animate-spin" /> : <WandSparkles className="h-4 w-4" />}
               AI 改写文案
             </button>
           </div>
         </div>
 
         <div className="grid gap-4 xl:grid-cols-[minmax(320px,1.08fr)_360px_340px]">
-          <ScriptPanel script={script} setScript={setScript} scriptCount={scriptCount} handleRewrite={handleRewrite} />
-          <PreviewPanel selectedAvatar={selectedAvatar} selectedVoice={selectedVoice} script={script} aspect={aspect} setAspect={setAspect} />
+          <ScriptPanel script={script} setScript={setScript} handleRewrite={handleRewrite} pasteFromClipboard={pasteFromClipboard} busy={busy} />
+          <PreviewPanel selectedAvatar={selectedAvatar} selectedVoice={selectedVoice} script={script} subtitleStyle={subtitleStyle} backgroundConfig={backgroundConfig} />
           <SettingsPanel
+            avatars={avatars}
+            voices={voices}
+            selectedAvatarId={selectedAvatarId}
+            setSelectedAvatarId={setSelectedAvatarId}
+            selectedVoiceId={selectedVoiceId}
+            setSelectedVoiceId={setSelectedVoiceId}
             selectedAvatar={selectedAvatar}
-            setSelectedAvatar={setSelectedAvatar}
             selectedVoice={selectedVoice}
-            setSelectedVoice={setSelectedVoice}
-            tone={tone}
-            setTone={setTone}
-            speed={speed}
-            setSpeed={setSpeed}
-            volume={volume}
-            setVolume={setVolume}
-            aspect={aspect}
+            subtitleStyle={subtitleStyle}
+            setSubtitleStyle={setSubtitleStyle}
+            backgroundConfig={backgroundConfig}
+            setBackgroundConfig={setBackgroundConfig}
+            introOutroConfig={introOutroConfig}
+            setIntroOutroConfig={setIntroOutroConfig}
             handleGenerate={handleGenerate}
+            busy={busy}
+            setActiveView={setActiveView}
+            setToast={setToast}
           />
         </div>
       </section>
 
       {isWorkbench ? (
         <section className="grid gap-4 xl:grid-cols-[1fr_360px]">
-          <RecentTasks tasks={tasks.slice(0, 4)} />
-          <QuickWorks works={works.slice(0, 3)} />
+          <RecentTasks tasks={jobs.slice(0, 4)} setActiveView={setActiveView} />
+          <QuickWorks projects={projects.slice(0, 3)} setActiveView={setActiveView} />
         </section>
       ) : null}
     </div>
   );
 }
 
-function ScriptPanel({ script, setScript, scriptCount, handleRewrite }) {
+function ScriptPanel({ script, setScript, handleRewrite, pasteFromClipboard, busy }) {
+  const overLimit = script.length > 3000;
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="font-black text-slate-900">脚本输入</h3>
         <div className="flex gap-2">
-          <button className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-500" type="button">
+          <button className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-500" type="button" onClick={pasteFromClipboard}>
             粘贴文案
           </button>
-          <button className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700" type="button" onClick={handleRewrite}>
+          <button className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 disabled:opacity-60" type="button" onClick={handleRewrite} disabled={busy === 'rewrite'}>
             AI 优化
           </button>
         </div>
       </div>
       <textarea
-        className="h-[330px] w-full resize-none rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-7 text-slate-700 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
+        className={`h-[330px] w-full resize-none rounded-2xl border bg-white p-4 text-sm leading-7 text-slate-700 outline-none transition focus:ring-4 ${
+          overLimit ? 'border-rose-300 focus:ring-rose-100' : 'border-slate-200 focus:border-blue-300 focus:ring-blue-100'
+        }`}
         value={script}
-        maxLength={2000}
+        maxLength={3000}
         onChange={(event) => setScript(event.target.value)}
+        placeholder="请输入 500 字以内的短口播文案，最多支持 3000 字。"
       />
-      <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
-        <span>字数统计：{scriptCount}/2000</span>
+      <div className="mt-3 flex items-center justify-between text-xs">
+        <span className={overLimit ? 'font-bold text-rose-600' : script.length > 500 ? 'text-amber-600' : 'text-slate-400'}>
+          字数统计：{script.length}/3000 {script.length > 500 ? '，长文案会生成更长视频' : ''}
+        </span>
         <button className="font-bold text-blue-600" type="button" onClick={() => setScript('')}>
           清空
         </button>
       </div>
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <SelectLike label="语言" value="普通话" />
-        <SelectLike label="风格" value="热情亲切" />
-        <SelectLike label="语速" value="1.0x" />
-      </div>
-
-      <label className="mt-4 flex cursor-pointer items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3">
-        <span className="text-sm font-bold text-slate-700">自动优化停顿</span>
-        <input className="h-5 w-10 accent-blue-600" type="checkbox" defaultChecked />
-      </label>
     </div>
   );
 }
 
-function PreviewPanel({ selectedAvatar, selectedVoice, script, aspect, setAspect }) {
-  const subtitle = script.slice(0, 24) || '输入文案后生成字幕预览';
+function PreviewPanel({ selectedAvatar, selectedVoice, script, subtitleStyle, backgroundConfig }) {
+  const subtitle = script.slice(0, 26) || '输入文案后生成字幕预览';
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-3">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="font-black text-slate-900">视频预览</h3>
-        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">竖屏优先</span>
+        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">1080×1920</span>
       </div>
       <div className="mx-auto w-full max-w-[285px]">
         <div className="relative aspect-[9/16] overflow-hidden rounded-[28px] border-[8px] border-slate-950 bg-slate-900 shadow-2xl">
-          <img className="h-full w-full object-cover opacity-95" src={selectedAvatar.image} alt={`${selectedAvatar.name} 预览`} />
+          {selectedAvatar?.previewImage ? (
+            <img className="h-full w-full object-cover opacity-95" src={selectedAvatar.previewImage} alt={`${selectedAvatar.name} 预览`} />
+          ) : (
+            <div className="grid h-full place-items-center text-sm font-bold text-white/70">请选择数字人</div>
+          )}
           <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/55" />
-          <div className="absolute left-3 top-3 rounded-full bg-black/35 px-2.5 py-1 text-xs font-bold text-white backdrop-blur">1080×1920</div>
+          <div className="absolute left-3 top-3 rounded-full bg-black/35 px-2.5 py-1 text-xs font-bold text-white backdrop-blur">{backgroundConfig}</div>
           <div className="absolute bottom-20 left-4 right-4 text-center">
-            <p className="rounded-lg bg-black/40 px-2 py-1 text-lg font-black leading-tight text-white shadow-lg">
-              {subtitle}
-            </p>
-            <p className="mt-1 inline-block rounded bg-yellow-300 px-1.5 py-0.5 text-base font-black text-slate-950">限时优惠 立即抢购</p>
+            <p className="rounded-lg bg-black/45 px-2 py-1 text-lg font-black leading-tight text-white shadow-lg">{subtitle}</p>
+            <p className="mt-1 inline-block rounded bg-yellow-300 px-1.5 py-0.5 text-base font-black text-slate-950">{subtitleStyle}</p>
           </div>
           <div className="absolute bottom-4 left-4 right-4 flex items-center gap-3 text-white">
-            <button className="grid h-8 w-8 place-items-center rounded-full bg-white/18 backdrop-blur" type="button">
+            <button className="grid h-8 w-8 place-items-center rounded-full bg-white/18 backdrop-blur" type="button" aria-label="播放预览" onClick={() => window.dispatchEvent(new CustomEvent('app-toast', { detail: '当前为静态预览，生成后可播放真实视频' }))}>
               <Play className="h-4 w-4 fill-white" />
             </button>
             <div className="h-1 flex-1 rounded-full bg-white/25">
@@ -737,70 +655,70 @@ function PreviewPanel({ selectedAvatar, selectedVoice, script, aspect, setAspect
           </div>
         </div>
       </div>
-      <div className="mt-3 flex items-center justify-center gap-2">
-        {['9:16', '3:4', '1:1', '16:9'].map((item) => (
-          <button
-            key={item}
-            type="button"
-            onClick={() => setAspect(item)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-black ${
-              aspect === item ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-            }`}
-          >
-            {item}
-          </button>
-        ))}
-      </div>
       <div className="mt-3 rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-500">
-        当前声音：<span className="font-bold text-slate-800">{selectedVoice.name}</span>
+        当前声音：<span className="font-bold text-slate-800">{selectedVoice?.name || '未选择'}</span>
       </div>
     </div>
   );
 }
 
 function SettingsPanel({
+  avatars,
+  voices,
+  selectedAvatarId,
+  setSelectedAvatarId,
+  selectedVoiceId,
+  setSelectedVoiceId,
   selectedAvatar,
-  setSelectedAvatar,
   selectedVoice,
-  setSelectedVoice,
-  tone,
-  setTone,
-  speed,
-  setSpeed,
-  volume,
-  setVolume,
-  aspect,
+  subtitleStyle,
+  setSubtitleStyle,
+  backgroundConfig,
+  setBackgroundConfig,
+  introOutroConfig,
+  setIntroOutroConfig,
   handleGenerate,
+  busy,
+  setActiveView,
+  setToast,
 }) {
   return (
     <div className="space-y-3">
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="font-black text-slate-900">数字人设置</h3>
-          <button className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700" type="button">
-            更换形象
+          <button className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700" type="button" onClick={() => setActiveView('avatars')}>
+            管理形象
           </button>
         </div>
-        <div className="flex items-center gap-3">
-          <img className="h-14 w-14 rounded-2xl object-cover" src={selectedAvatar.image} alt={selectedAvatar.name} />
-          <div className="min-w-0">
-            <div className="font-black text-slate-900">{selectedAvatar.name}</div>
-            <div className="text-xs text-slate-500">
-              {selectedAvatar.gender} | {selectedAvatar.age} | {selectedAvatar.scene}
+        <select className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 outline-none" value={selectedAvatarId} onChange={(event) => setSelectedAvatarId(event.target.value)}>
+          <option value="">请选择数字人</option>
+          {avatars.map((avatar) => (
+            <option key={avatar.id} value={avatar.id}>
+              {avatar.name} · {avatar.gender} · {avatar.style}
+            </option>
+          ))}
+        </select>
+        {selectedAvatar ? (
+          <div className="mt-3 flex items-center gap-3">
+            <img className="h-14 w-14 rounded-2xl object-cover" src={selectedAvatar.previewImage} alt={selectedAvatar.name} />
+            <div className="min-w-0">
+              <div className="font-black text-slate-900">{selectedAvatar.name}</div>
+              <div className="text-xs text-slate-500">
+                {selectedAvatar.gender} | {selectedAvatar.style} | {selectedAvatar.status}
+              </div>
             </div>
           </div>
-        </div>
+        ) : null}
         <div className="mt-3 grid grid-cols-3 gap-2">
           {avatars.slice(0, 3).map((avatar) => (
             <button
               key={avatar.id}
               type="button"
-              onClick={() => setSelectedAvatar(avatar)}
-              className={`overflow-hidden rounded-xl border ${
-                selectedAvatar.id === avatar.id ? 'border-blue-500 ring-4 ring-blue-100' : 'border-slate-200'
-              }`}
+              onClick={() => setSelectedAvatarId(avatar.id)}
+              className={`overflow-hidden rounded-xl border ${selectedAvatarId === avatar.id ? 'border-blue-500 ring-4 ring-blue-100' : 'border-slate-200'}`}
             >
-              <img className="h-16 w-full object-cover" src={avatar.image} alt={avatar.name} />
+              <img className="h-16 w-full object-cover" src={avatar.previewImage} alt={avatar.name} />
             </button>
           ))}
         </div>
@@ -809,249 +727,420 @@ function SettingsPanel({
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="font-black text-slate-900">声音设置</h3>
-          <button className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600" type="button">
-            克隆声音
+          <button className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600" type="button" onClick={() => setActiveView('voices')}>
+            声音库
           </button>
         </div>
         <select
           className="mb-3 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 outline-none"
-          value={selectedVoice.id}
-          onChange={(event) => setSelectedVoice(voices.find((voice) => voice.id === event.target.value) || voices[0])}
+          value={selectedVoiceId}
+          onChange={(event) => setSelectedVoiceId(event.target.value)}
         >
+          <option value="">请选择声音</option>
           {voices.map((voice) => (
-            <option key={voice.id} value={voice.id}>
-              {voice.name}
+            <option key={voice.id} value={voice.id} disabled={voice.status !== 'ready'}>
+              {voice.name} · {voice.language} · {voice.status === 'ready' ? '可用' : '克隆中'}
             </option>
           ))}
         </select>
         <div className="flex items-center gap-3 rounded-xl bg-blue-50 p-3">
-          <button className="grid h-8 w-8 place-items-center rounded-full bg-blue-600 text-white" type="button">
+          <button className="grid h-8 w-8 place-items-center rounded-full bg-blue-600 text-white" type="button" onClick={() => setToast(selectedVoice ? `试听：${selectedVoice.name}` : '请先选择声音')}>
             <Play className="h-4 w-4 fill-white" />
           </button>
-          <Waveform seed={selectedVoice.name.length} />
+          <Waveform seed={selectedVoice?.name?.length || 4} />
         </div>
-        <RangeControl label="音量" value={volume} min={0} max={100} suffix="%" onChange={setVolume} />
-        <RangeControl label="语速" value={speed} min={0.6} max={1.5} step={0.1} suffix="x" onChange={setSpeed} />
-        <SelectInput label="语气" value={tone} onChange={setTone} options={['热情亲切', '清晰有感染力', '稳重专业', '温柔知性']} />
+        {selectedVoice?.sampleUrl ? <audio className="mt-3 w-full" src={selectedVoice.sampleUrl} controls /> : null}
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <h3 className="mb-3 font-black text-slate-900">视频设置</h3>
-        <div className="grid gap-3">
-          <SelectLike label="背景" value="简约布景" />
-          <SelectLike label="画质" value={aspect === '9:16' ? '1080P 竖屏' : '1080P'} />
-          <SelectLike label="帧率" value="25fps" />
-        </div>
+        <SelectInput label="字幕样式" value={subtitleStyle} options={subtitleOptions} onChange={setSubtitleStyle} />
+        <SelectInput label="背景设置" value={backgroundConfig} options={backgroundOptions} onChange={setBackgroundConfig} />
+        <SelectInput label="片头片尾" value={introOutroConfig} options={introOutroOptions} onChange={setIntroOutroConfig} />
         <button
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-sm font-black text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700"
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-sm font-black text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           type="button"
           onClick={handleGenerate}
+          disabled={busy === 'generate'}
         >
-          <Video className="h-4 w-4" />
+          {busy === 'generate' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
           生成视频
         </button>
-        <p className="mt-2 text-center text-xs text-slate-400">预计消耗 10 积分</p>
+        <p className="mt-2 text-center text-xs text-slate-400">创建任务后进入任务中心，完成后自动生成作品</p>
       </div>
     </div>
   );
 }
 
-function LibraryPage({ initialTab, selectedAvatar, setSelectedAvatar, selectedVoice, setSelectedVoice, setToast }) {
+function LibraryPage({ initialTab, avatars, voices, refreshAll, selectedAvatarId, setSelectedAvatarId, selectedVoiceId, setSelectedVoiceId, setToast }) {
   const [tab, setTab] = useState(initialTab);
   const [query, setQuery] = useState('');
-  const filteredAvatars = avatars.filter((avatar) => avatar.name.includes(query) || avatar.scene.includes(query) || !query);
-  const filteredVoices = voices.filter((voice) => voice.name.includes(query) || voice.tone.includes(query) || !query);
+
+  useEffect(() => {
+    setTab(initialTab);
+  }, [initialTab]);
+
+  const filteredAvatars = avatars.filter((avatar) => [avatar.name, avatar.gender, avatar.style].join(' ').includes(query));
+  const filteredVoices = voices.filter((voice) => [voice.name, voice.gender, voice.language, voice.style].join(' ').includes(query));
 
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-panel">
       <div className="mb-4 flex flex-col justify-between gap-3 xl:flex-row xl:items-center">
         <div>
           <h2 className="text-xl font-black text-slate-950">数字人形象与声音库</h2>
-          <p className="mt-1 text-sm text-slate-500">管理数字人、选择声音模型，并支持上传或克隆专属声音。</p>
+          <p className="mt-1 text-sm text-slate-500">数据来自 SQLite API，支持新增、编辑、删除、默认选择和上传。</p>
         </div>
-        <button className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white shadow-soft" type="button">
-          <Plus className="h-4 w-4" />
-          创建数字人
-        </button>
       </div>
 
       <div className="mb-4 flex border-b border-slate-200">
-        <TabButton active={tab === 'avatars'} onClick={() => setTab('avatars')}>
-          数字人形象
-        </TabButton>
-        <TabButton active={tab === 'voices'} onClick={() => setTab('voices')}>
-          声音库
-        </TabButton>
-        <TabButton active={tab === 'mine'} onClick={() => setTab('mine')}>
-          我的形象
-        </TabButton>
+        <TabButton active={tab === 'avatars'} onClick={() => setTab('avatars')}>数字人形象</TabButton>
+        <TabButton active={tab === 'voices'} onClick={() => setTab('voices')}>声音库</TabButton>
       </div>
 
       <div className="mb-4 flex flex-col justify-between gap-3 xl:flex-row xl:items-center">
         <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap">
-          <FilterButton label="性别" value="全部" />
-          <FilterButton label="年龄" value="全部" />
-          <FilterButton label="场景" value="全部" />
-          <FilterButton label="风格" value="全部" />
+          <FilterButton label="状态" value="全部" onClick={() => setToast('当前显示全部状态')} />
+          <FilterButton label="来源" value="数据库" onClick={() => setToast('当前列表来自后端 API')} />
         </div>
         <div className="relative min-w-0 xl:w-72">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索数字人或声音"
-          />
+          <input className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-100" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索数字人或声音" />
         </div>
       </div>
 
       {tab === 'voices' ? (
-        <VoiceLibrary voices={filteredVoices} selectedVoice={selectedVoice} setSelectedVoice={setSelectedVoice} setToast={setToast} />
+        <VoiceLibrary voices={filteredVoices} refreshAll={refreshAll} selectedVoiceId={selectedVoiceId} setSelectedVoiceId={setSelectedVoiceId} setToast={setToast} />
       ) : (
-        <AvatarLibrary avatars={filteredAvatars} selectedAvatar={selectedAvatar} setSelectedAvatar={setSelectedAvatar} setToast={setToast} />
+        <AvatarLibrary avatars={filteredAvatars} refreshAll={refreshAll} selectedAvatarId={selectedAvatarId} setSelectedAvatarId={setSelectedAvatarId} setToast={setToast} />
       )}
     </section>
   );
 }
 
-function AvatarLibrary({ avatars: avatarItems, selectedAvatar, setSelectedAvatar, setToast }) {
+function AvatarLibrary({ avatars, refreshAll, selectedAvatarId, setSelectedAvatarId, setToast }) {
+  const [modal, setModal] = useState(null);
+  const [preview, setPreview] = useState(null);
+
+  async function deleteAvatar(avatar) {
+    if (!window.confirm(`确认删除数字人「${avatar.name}」？已被任务引用的形象会被归档。`)) return;
+    try {
+      await apiFetch(`/api/avatars/${avatar.id}`, { method: 'DELETE' });
+      setToast('数字人已删除');
+      refreshAll({ silent: true });
+    } catch (error) {
+      setToast(error.message);
+    }
+  }
+
+  async function setDefault(avatar) {
+    try {
+      const updated = await apiFetch(`/api/avatars/${avatar.id}/default`, { method: 'POST' });
+      setSelectedAvatarId(updated.id);
+      setToast(`已设置默认数字人：${updated.name}`);
+      refreshAll({ silent: true });
+    } catch (error) {
+      setToast(error.message);
+    }
+  }
+
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {avatarItems.map((avatar) => {
-        const isActive = selectedAvatar.id === avatar.id;
-        return (
-          <button
-            key={avatar.id}
-            type="button"
-            onClick={() => {
-              setSelectedAvatar(avatar);
-              setToast(`已选择数字人「${avatar.name}」`);
-            }}
-            className={`group overflow-hidden rounded-2xl border bg-white text-left transition hover:-translate-y-0.5 hover:shadow-soft ${
-              isActive ? 'border-blue-500 ring-4 ring-blue-100' : 'border-slate-200'
-            }`}
-          >
-            <div className="relative h-52 bg-slate-100">
-              <img className="h-full w-full object-cover transition group-hover:scale-[1.03]" src={avatar.image} alt={avatar.name} />
-              {avatar.badge ? (
-                <span className="absolute right-3 top-3 rounded-full bg-blue-600 px-2 py-1 text-xs font-black text-white">{avatar.badge}</span>
-              ) : null}
-            </div>
+    <>
+      <div className="mb-4 flex justify-end">
+        <button className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white shadow-soft" type="button" onClick={() => setModal({ mode: 'create' })}>
+          <Plus className="h-4 w-4" />
+          创建数字人
+        </button>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {avatars.map((avatar) => (
+          <article key={avatar.id} className={`overflow-hidden rounded-2xl border bg-white text-left transition hover:-translate-y-0.5 hover:shadow-soft ${selectedAvatarId === avatar.id ? 'border-blue-500 ring-4 ring-blue-100' : 'border-slate-200'}`}>
+            <button className="relative h-52 w-full bg-slate-100" type="button" onClick={() => setSelectedAvatarId(avatar.id)}>
+              <img className="h-full w-full object-cover" src={avatar.previewImage} alt={avatar.name} />
+              {avatar.isDefault ? <span className="absolute right-3 top-3 rounded-full bg-blue-600 px-2 py-1 text-xs font-black text-white">默认</span> : null}
+            </button>
             <div className="p-3">
-              <div className="font-black text-slate-950">{avatar.name}</div>
-              <div className="mt-1 text-xs text-slate-500">
-                {avatar.gender} | {avatar.age} | {avatar.scene}
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-black text-slate-950">{avatar.name}</div>
+                <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-500">{avatar.status}</span>
               </div>
-              <div className="mt-2 rounded-lg bg-slate-50 px-2 py-1 text-xs text-slate-500">{avatar.outfit}</div>
+              <div className="mt-1 text-xs text-slate-500">{avatar.gender} | {avatar.style}</div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <IconButton icon={Eye} label="预览" onClick={() => setPreview(avatar)} />
+                <IconButton icon={Edit3} label="编辑" onClick={() => setModal({ mode: 'edit', avatar })} />
+                <IconButton icon={CheckCircle2} label="设为默认" onClick={() => setDefault(avatar)} />
+                <IconButton icon={Trash2} label="删除" danger onClick={() => deleteAvatar(avatar)} />
+              </div>
             </div>
-          </button>
-        );
-      })}
-      <button
-        type="button"
-        className="grid min-h-[304px] place-items-center rounded-2xl border border-dashed border-blue-200 bg-blue-50/40 text-center text-blue-600"
-      >
-        <div>
-          <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-white shadow-soft">
-            <Plus className="h-6 w-6" />
-          </div>
-          <div className="mt-3 text-sm font-black">创建数字人</div>
-        </div>
-      </button>
-    </div>
+          </article>
+        ))}
+      </div>
+      {modal ? <AvatarModal modal={modal} onClose={() => setModal(null)} refreshAll={refreshAll} setToast={setToast} setSelectedAvatarId={setSelectedAvatarId} /> : null}
+      {preview ? <PreviewImageModal title={preview.name} image={preview.previewImage} onClose={() => setPreview(null)} /> : null}
+    </>
   );
 }
 
-function VoiceLibrary({ voices: voiceItems, selectedVoice, setSelectedVoice, setToast }) {
+function AvatarModal({ modal, onClose, refreshAll, setToast, setSelectedAvatarId }) {
+  const avatar = modal.avatar;
+  const [name, setName] = useState(avatar?.name || '');
+  const [gender, setGender] = useState(avatar?.gender || '女性');
+  const [style, setStyle] = useState(avatar?.style || '电商口播');
+  const [isDefault, setIsDefault] = useState(Boolean(avatar?.isDefault));
+  const [file, setFile] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit(event) {
+    event.preventDefault();
+    if (!name.trim() || !style.trim()) {
+      setToast('请填写名称和风格');
+      return;
+    }
+    if (!avatar && !file) {
+      setToast('请上传数字人形象图');
+      return;
+    }
+    const form = new FormData();
+    form.append('name', name);
+    form.append('gender', gender);
+    form.append('style', style);
+    form.append('isDefault', String(isDefault));
+    if (file) form.append('image', file);
+    setBusy(true);
+    try {
+      const saved = await apiFetch(avatar ? `/api/avatars/${avatar.id}` : '/api/avatars', {
+        method: avatar ? 'PUT' : 'POST',
+        body: form,
+      });
+      if (saved.isDefault) setSelectedAvatarId(saved.id);
+      setToast(avatar ? '数字人已更新' : '数字人已创建');
+      onClose();
+      refreshAll({ silent: true });
+    } catch (error) {
+      setToast(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <div className="grid gap-4 xl:grid-cols-[1fr_300px]">
-      <div className="overflow-hidden rounded-2xl border border-slate-200">
-        <table className="w-full min-w-[760px] border-collapse text-sm">
+    <Modal title={avatar ? '编辑数字人' : '新增数字人'} onClose={onClose}>
+      <form className="space-y-3" onSubmit={submit}>
+        <TextField label="名称" value={name} onChange={setName} />
+        <SelectInput label="性别" value={gender} options={['女性', '男性', '中性']} onChange={setGender} />
+        <TextField label="风格" value={style} onChange={setStyle} placeholder="电商口播 / 企业宣传 / 课程讲解" />
+        <label className="block">
+          <span className="mb-1 block text-xs font-bold text-slate-500">形象图</span>
+          <input className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" type="file" accept="image/*" onChange={(event) => setFile(event.target.files?.[0] || null)} />
+        </label>
+        <label className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600">
+          <input type="checkbox" checked={isDefault} onChange={(event) => setIsDefault(event.target.checked)} />
+          设为默认数字人
+        </label>
+        <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-sm font-black text-white disabled:opacity-60" type="submit" disabled={busy}>
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          保存
+        </button>
+      </form>
+    </Modal>
+  );
+}
+
+function VoiceLibrary({ voices, refreshAll, selectedVoiceId, setSelectedVoiceId, setToast }) {
+  const [modalOpen, setModalOpen] = useState(false);
+
+  async function deleteVoice(voice) {
+    if (!window.confirm(`确认删除声音「${voice.name}」？已被任务引用的声音会被归档。`)) return;
+    try {
+      await apiFetch(`/api/voices/${voice.id}`, { method: 'DELETE' });
+      setToast('声音已删除');
+      refreshAll({ silent: true });
+    } catch (error) {
+      setToast(error.message);
+    }
+  }
+
+  async function setDefault(voice) {
+    try {
+      const updated = await apiFetch(`/api/voices/${voice.id}/default`, { method: 'POST' });
+      setSelectedVoiceId(updated.id);
+      setToast(`已设置默认声音：${updated.name}`);
+      refreshAll({ silent: true });
+    } catch (error) {
+      setToast(error.message);
+    }
+  }
+
+  return (
+    <>
+      <div className="mb-4 flex justify-end">
+        <button className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white shadow-soft" type="button" onClick={() => setModalOpen(true)}>
+          <Upload className="h-4 w-4" />
+          上传/克隆声音
+        </button>
+      </div>
+      <div className="overflow-x-auto rounded-2xl border border-slate-200">
+        <table className="w-full min-w-[860px] border-collapse text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
             <tr>
               <th className="px-4 py-3">声音名称</th>
-              <th className="px-4 py-3">语言/口音</th>
+              <th className="px-4 py-3">语言</th>
               <th className="px-4 py-3">风格</th>
+              <th className="px-4 py-3">状态</th>
               <th className="px-4 py-3">试听</th>
-              <th className="px-4 py-3">时长</th>
+              <th className="px-4 py-3">创建时间</th>
               <th className="px-4 py-3">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {voiceItems.map((voice) => (
-              <tr key={voice.id} className={selectedVoice.id === voice.id ? 'bg-blue-50/60' : 'bg-white'}>
-                <td className="px-4 py-3 font-black text-slate-800">{voice.name}</td>
-                <td className="px-4 py-3 text-slate-500">{voice.lang}</td>
-                <td className="px-4 py-3 text-slate-500">{voice.tone}</td>
+            {voices.map((voice) => (
+              <tr key={voice.id} className={selectedVoiceId === voice.id ? 'bg-blue-50/60' : 'bg-white'}>
                 <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <button className="grid h-7 w-7 place-items-center rounded-full bg-blue-600 text-white" type="button">
-                      <Play className="h-3.5 w-3.5 fill-white" />
-                    </button>
-                    <Waveform seed={voice.name.length} compact />
-                  </div>
+                  <div className="font-black text-slate-800">{voice.name}</div>
+                  <div className="text-xs text-slate-400">{voice.gender} {voice.isDefault ? '· 默认' : ''}</div>
                 </td>
-                <td className="px-4 py-3 text-slate-500">{voice.duration}</td>
+                <td className="px-4 py-3 text-slate-500">{voice.language}</td>
+                <td className="px-4 py-3 text-slate-500">{voice.style}</td>
                 <td className="px-4 py-3">
-                  <button
-                    className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-black text-white"
-                    type="button"
-                    onClick={() => {
-                      setSelectedVoice(voice);
-                      setToast(`已选择声音「${voice.name}」`);
-                    }}
-                  >
-                    使用
-                  </button>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-black ${voice.status === 'ready' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                    {voice.status === 'ready' ? '可用' : '克隆中'}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <audio className="w-44" src={voice.sampleUrl} controls />
+                </td>
+                <td className="px-4 py-3 text-slate-500">{formatDate(voice.createdAt)}</td>
+                <td className="px-4 py-3">
+                  <div className="flex gap-2">
+                    <button className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-black text-white disabled:bg-slate-300" type="button" disabled={voice.status !== 'ready'} onClick={() => setSelectedVoiceId(voice.id)}>
+                      使用
+                    </button>
+                    <button className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600" type="button" onClick={() => setDefault(voice)}>
+                      默认
+                    </button>
+                    <button className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-black text-rose-600" type="button" onClick={() => deleteVoice(voice)}>
+                      删除
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-        <h3 className="font-black text-slate-950">上传我的声音</h3>
-        <p className="mt-1 text-sm text-slate-500">支持 mp3/wav 格式，建议 30 秒以上清晰人声。</p>
-        <button className="mt-4 flex h-36 w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-blue-200 bg-white text-blue-600" type="button">
-          <Upload className="h-7 w-7" />
-          <span className="text-sm font-black">上传文件</span>
-        </button>
-        <div className="mt-4 space-y-3 rounded-2xl bg-white p-3 text-sm text-slate-600">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-emerald-600" />
-            自动降噪与音量标准化
-          </div>
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-blue-600" />
-            可创建专属 TTS 声音
-          </div>
-        </div>
-      </div>
-    </div>
+      {modalOpen ? <VoiceModal onClose={() => setModalOpen(false)} refreshAll={refreshAll} setToast={setToast} setSelectedVoiceId={setSelectedVoiceId} /> : null}
+    </>
   );
 }
 
-function TaskCenterPage({ tasks, setTasks }) {
-  const taskStats = [
-    { label: '今日任务', value: 23, icon: FileText, tone: 'blue', hint: '较昨日 +15%' },
-    { label: '进行中', value: tasks.filter((task) => ['queued', 'running', 'composing'].includes(task.status)).length, icon: Clock3, tone: 'cyan', hint: '较昨日 +20%' },
-    { label: '已完成', value: tasks.filter((task) => task.status === 'done').length, icon: CheckCircle2, tone: 'green', hint: '较昨日 +32%' },
-    { label: '失败任务', value: tasks.filter((task) => task.status === 'failed').length, icon: XCircle, tone: 'rose', hint: '较昨日 -50%' },
-    { label: '累计生成', value: '1,245', icon: Gauge, tone: 'violet', hint: '较昨日 +18%' },
+function VoiceModal({ onClose, refreshAll, setToast, setSelectedVoiceId }) {
+  const [name, setName] = useState('');
+  const [gender, setGender] = useState('女性');
+  const [language, setLanguage] = useState('普通话');
+  const [style, setStyle] = useState('活力亲切');
+  const [clone, setClone] = useState(true);
+  const [isDefault, setIsDefault] = useState(false);
+  const [file, setFile] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit(event) {
+    event.preventDefault();
+    if (!name.trim() || !style.trim()) {
+      setToast('请填写声音名称和风格');
+      return;
+    }
+    if (!file) {
+      setToast('请上传 mp3 或 wav 声音样本');
+      return;
+    }
+    const form = new FormData();
+    form.append('name', name);
+    form.append('gender', gender);
+    form.append('language', language);
+    form.append('style', style);
+    form.append('clone', String(clone));
+    form.append('isDefault', String(isDefault));
+    form.append('sample', file);
+    setBusy(true);
+    try {
+      const voice = await apiFetch('/api/voices', { method: 'POST', body: form });
+      if (voice.status === 'ready') setSelectedVoiceId(voice.id);
+      setToast(clone ? '声音样本已上传，克隆任务处理中' : '声音样本已上传');
+      onClose();
+      refreshAll({ silent: true });
+    } catch (error) {
+      setToast(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal title="上传/克隆声音" onClose={onClose}>
+      <form className="space-y-3" onSubmit={submit}>
+        <TextField label="声音名称" value={name} onChange={setName} />
+        <SelectInput label="性别" value={gender} options={['女性', '男性', '中性']} onChange={setGender} />
+        <TextField label="语言" value={language} onChange={setLanguage} />
+        <TextField label="风格" value={style} onChange={setStyle} />
+        <label className="block">
+          <span className="mb-1 block text-xs font-bold text-slate-500">声音样本 mp3/wav</span>
+          <input className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" type="file" accept="audio/mp3,audio/mpeg,audio/wav,audio/x-wav" onChange={(event) => setFile(event.target.files?.[0] || null)} />
+        </label>
+        <label className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600">
+          <input type="checkbox" checked={clone} onChange={(event) => setClone(event.target.checked)} />
+          进入声音克隆流程
+        </label>
+        <label className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600">
+          <input type="checkbox" checked={isDefault} onChange={(event) => setIsDefault(event.target.checked)} />
+          设为默认声音
+        </label>
+        <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-sm font-black text-white disabled:opacity-60" type="submit" disabled={busy}>
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          保存声音
+        </button>
+      </form>
+    </Modal>
+  );
+}
+
+function TaskCenterPage({ jobs, refreshAll, setToast }) {
+  const [detail, setDetail] = useState(null);
+  const stats = [
+    { label: '全部任务', value: jobs.length, icon: FileText, tone: 'blue', hint: '数据库记录' },
+    { label: '进行中', value: jobs.filter((job) => ['pending', 'running'].includes(job.status)).length, icon: Clock3, tone: 'cyan', hint: '轮询刷新' },
+    { label: '已完成', value: jobs.filter((job) => job.status === 'success').length, icon: CheckCircle2, tone: 'green', hint: '自动成片' },
+    { label: '失败任务', value: jobs.filter((job) => job.status === 'failed').length, icon: XCircle, tone: 'rose', hint: '支持重试' },
+    { label: '已取消', value: jobs.filter((job) => job.status === 'cancelled').length, icon: Gauge, tone: 'violet', hint: '可重试' },
   ];
+
+  async function cancelJob(job) {
+    try {
+      await apiFetch(`/api/jobs/${job.id}/cancel`, { method: 'POST' });
+      setToast('任务已取消');
+      refreshAll({ silent: true });
+    } catch (error) {
+      setToast(error.message);
+    }
+  }
+
+  async function retryJob(job) {
+    try {
+      await apiFetch(`/api/jobs/${job.id}/retry`, { method: 'POST' });
+      setToast('任务已重新进入队列');
+      refreshAll({ silent: true });
+    } catch (error) {
+      setToast(error.message);
+    }
+  }
 
   return (
     <section className="space-y-4">
       <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-panel">
         <div className="mb-4">
           <h2 className="text-xl font-black text-slate-950">任务中心</h2>
-          <p className="mt-1 text-sm text-slate-500">查看视频生成进度、管理任务状态，并支持重试、取消和下载。</p>
+          <p className="mt-1 text-sm text-slate-500">任务来自 generation_jobs 表，状态由 mock provider 推进。</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          {taskStats.map((item) => (
-            <MetricCard key={item.label} {...item} />
-          ))}
+          {stats.map((item) => <MetricCard key={item.label} {...item} />)}
         </div>
       </div>
 
@@ -1059,21 +1148,18 @@ function TaskCenterPage({ tasks, setTasks }) {
         <h3 className="mb-4 font-black text-slate-950">任务流程</h3>
         <div className="grid gap-3 md:grid-cols-5">
           {[
-            ['脚本解析', 23, Bot],
-            ['内容审核', 18, ShieldCheck],
-            ['视频生成', 8, Clapperboard],
-            ['合成渲染', 5, Video],
-            ['完成', 152, CheckCircle2],
-          ].map(([label, value, Icon], index) => (
-            <div key={label} className={`relative rounded-2xl border p-4 ${index === 2 ? 'border-blue-300 bg-blue-50' : 'border-slate-200 bg-white'}`}>
+            ['TTS 生成', 20, Mic2],
+            ['数字人驱动', 45, UserRound],
+            ['字幕生成', 70, FileText],
+            ['视频合成', 90, Video],
+            ['完成入库', 100, CheckCircle2],
+          ].map(([label, value, Icon]) => (
+            <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4">
               <div className="flex items-center justify-between">
-                <div className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-blue-600">
-                  <Icon className="h-5 w-5" />
-                </div>
-                <span className="text-xl font-black text-slate-950">{value}</span>
+                <div className="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-blue-600"><Icon className="h-5 w-5" /></div>
+                <span className="text-xl font-black text-slate-950">{value}%</span>
               </div>
               <div className="mt-3 text-sm font-black text-slate-700">{label}</div>
-              {index < 4 ? <div className="absolute -right-2 top-1/2 hidden h-px w-4 bg-slate-200 md:block" /> : null}
             </div>
           ))}
         </div>
@@ -1082,29 +1168,25 @@ function TaskCenterPage({ tasks, setTasks }) {
       <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-panel">
         <div className="mb-4 flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
           <div className="flex gap-2">
-            {['全部任务', '进行中', '已完成', '失败'].map((item, index) => (
-              <button key={item} className={`rounded-xl px-3 py-2 text-sm font-black ${index === 0 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`} type="button">
-                {item}
+            {['全部任务', 'pending', 'running', 'success', 'failed', 'cancelled'].map((item, index) => (
+              <button key={item} className={`rounded-xl px-3 py-2 text-sm font-black ${index === 0 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`} type="button" onClick={() => setToast(index === 0 ? '当前显示全部任务' : `筛选状态：${statusMap[item]?.label}`)}>
+                {statusMap[item]?.label || item}
               </button>
             ))}
           </div>
-          <button
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-600"
-            type="button"
-            onClick={() => setTasks((items) => items.map((task) => (task.status === 'failed' ? { ...task, status: 'queued', progress: 8 } : task)))}
-          >
+          <button className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-black text-slate-600" type="button" onClick={() => refreshAll({ silent: true })}>
             <RefreshCw className="h-4 w-4" />
-            重试失败任务
+            刷新任务
           </button>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] border-collapse text-sm">
+          <table className="w-full min-w-[980px] border-collapse text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400">
               <tr>
                 <th className="px-4 py-3">任务名称</th>
                 <th className="px-4 py-3">数字人</th>
-                <th className="px-4 py-3">时长</th>
-                <th className="px-4 py-3">分辨率</th>
+                <th className="px-4 py-3">声音</th>
+                <th className="px-4 py-3">阶段</th>
                 <th className="px-4 py-3">状态</th>
                 <th className="px-4 py-3">进度</th>
                 <th className="px-4 py-3">创建时间</th>
@@ -1112,28 +1194,28 @@ function TaskCenterPage({ tasks, setTasks }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {tasks.map((task) => {
-                const status = statusMap[task.status];
+              {jobs.map((job) => {
+                const status = statusMap[job.status] || statusMap.pending;
                 return (
-                  <tr key={task.id} className="bg-white">
-                    <td className="px-4 py-3 font-black text-slate-800">{task.title}</td>
-                    <td className="px-4 py-3 text-slate-500">{task.avatar}</td>
-                    <td className="px-4 py-3 text-slate-500">{task.duration}</td>
-                    <td className="px-4 py-3 text-slate-500">{task.resolution}</td>
+                  <tr key={job.id} className="bg-white">
+                    <td className="px-4 py-3 font-black text-slate-800">{job.title}</td>
+                    <td className="px-4 py-3 text-slate-500">{job.avatar?.name || '-'}</td>
+                    <td className="px-4 py-3 text-slate-500">{job.voice?.name || '-'}</td>
+                    <td className="px-4 py-3 text-slate-500">{job.stage}</td>
                     <td className={`px-4 py-3 font-black ${status.color}`}>{status.label}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-24 rounded-full bg-slate-100">
-                          <div className={`h-full rounded-full ${status.bar}`} style={{ width: `${task.progress}%` }} />
-                        </div>
-                        <span className="w-9 text-xs text-slate-400">{task.progress}%</span>
+                        <div className="h-1.5 w-24 rounded-full bg-slate-100"><div className={`h-full rounded-full ${status.bar}`} style={{ width: `${job.progress}%` }} /></div>
+                        <span className="w-9 text-xs text-slate-400">{job.progress}%</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-slate-500">{task.createdAt}</td>
+                    <td className="px-4 py-3 text-slate-500">{formatDate(job.createdAt)}</td>
                     <td className="px-4 py-3">
-                      <button className="font-black text-blue-600" type="button">
-                        {task.status === 'done' ? '下载' : task.status === 'failed' ? '重试' : '取消'}
-                      </button>
+                      <div className="flex gap-2">
+                        <button className="font-black text-blue-600" type="button" onClick={() => setDetail(job)}>详情</button>
+                        {['pending', 'running'].includes(job.status) ? <button className="font-black text-amber-600" type="button" onClick={() => cancelJob(job)}>取消</button> : null}
+                        {['failed', 'cancelled'].includes(job.status) ? <button className="font-black text-blue-600" type="button" onClick={() => retryJob(job)}>重试</button> : null}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -1142,76 +1224,90 @@ function TaskCenterPage({ tasks, setTasks }) {
           </table>
         </div>
       </div>
+      {detail ? <JobDetailModal job={detail} onClose={() => setDetail(null)} /> : null}
     </section>
   );
 }
 
-function WorksTemplatesPage({ initialTab, works, setWorks, handleQuickTemplate }) {
+function WorksTemplatesPage({ initialTab, projects, templates, avatars, voices, refreshAll, setToast, applyTemplate, reuseProject }) {
   const [tab, setTab] = useState(initialTab);
   const [query, setQuery] = useState('');
-  const shownWorks = works.filter((work) => work.title.includes(query) || work.avatar.includes(query) || !query);
+  const [category, setCategory] = useState('全部');
+  const [preview, setPreview] = useState(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
+
+  useEffect(() => {
+    setTab(initialTab);
+  }, [initialTab]);
+
+  const shownProjects = projects.filter((project) => [project.title, project.avatar?.name, project.voice?.name].join(' ').includes(query));
+  const shownTemplates = templates.filter((template) => category === '全部' || template.category === category);
+
+  async function deleteProject(project) {
+    if (!window.confirm(`确认删除作品「${project.title}」？`)) return;
+    try {
+      await apiFetch(`/api/projects/${project.id}`, { method: 'DELETE' });
+      setToast('作品已删除');
+      refreshAll({ silent: true });
+    } catch (error) {
+      setToast(error.message);
+    }
+  }
 
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-panel">
       <div className="mb-4 flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
         <div>
           <h2 className="text-xl font-black text-slate-950">作品管理 / 模板中心</h2>
-          <p className="mt-1 text-sm text-slate-500">集中管理成品视频、模板素材，并从模板一键发起竖屏口播生成。</p>
+          <p className="mt-1 text-sm text-slate-500">作品和模板均从 API 读取，支持预览、下载、删除、复用配置和上传视频。</p>
         </div>
-        <button className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white shadow-soft" type="button">
-          <Plus className="h-4 w-4" />
-          新建视频
+        <button className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white shadow-soft" type="button" onClick={() => setUploadOpen(true)}>
+          <Upload className="h-4 w-4" />
+          上传作品
         </button>
       </div>
 
       <div className="mb-4 flex border-b border-slate-200">
-        <TabButton active={tab === 'works'} onClick={() => setTab('works')}>
-          我的作品
-        </TabButton>
-        <TabButton active={tab === 'templates'} onClick={() => setTab('templates')}>
-          模板中心
-        </TabButton>
-        <TabButton active={tab === 'recycle'} onClick={() => setTab('recycle')}>
-          回收站
-        </TabButton>
+        <TabButton active={tab === 'works'} onClick={() => setTab('works')}>我的作品</TabButton>
+        <TabButton active={tab === 'templates'} onClick={() => setTab('templates')}>模板中心</TabButton>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1fr_300px]">
         <div>
           <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="grid grid-cols-2 gap-2 sm:flex">
-              <FilterButton label="全部状态" value="全部" />
-              <FilterButton label="全部数字人" value="全部" />
-              <FilterButton label="全部时间" value="最近 30 天" />
+              {tab === 'templates' ? (
+                <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600" value={category} onChange={(event) => setCategory(event.target.value)}>
+                  {templateCategories.map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
+              ) : (
+                <>
+                  <FilterButton label="全部状态" value="ready" onClick={() => setToast('当前显示 ready 作品')} />
+                  <FilterButton label="全部时间" value="最近" onClick={() => setToast('当前按创建时间倒序展示')} />
+                </>
+              )}
             </div>
             <div className="flex gap-2">
               <div className="relative min-w-0">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-100 lg:w-64"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="搜索作品名称"
-                />
+                <input className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-100 lg:w-64" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索作品名称" />
               </div>
-              <button className="grid h-10 w-10 place-items-center rounded-xl bg-blue-600 text-white" type="button">
+              <button className="grid h-10 w-10 place-items-center rounded-xl bg-blue-600 text-white" type="button" onClick={() => setToast('当前为网格视图')}>
                 <Grid3X3 className="h-4 w-4" />
               </button>
             </div>
           </div>
 
           {tab === 'templates' ? (
-            <TemplateGrid handleQuickTemplate={handleQuickTemplate} />
+            <TemplateGrid templates={shownTemplates} applyTemplate={applyTemplate} />
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {shownWorks.map((work) => (
-                <WorkCard key={work.id} work={work} setWorks={setWorks} />
+              {shownProjects.map((project) => (
+                <WorkCard key={project.id} project={project} onPreview={setPreview} onDelete={deleteProject} onReuse={reuseProject} />
               ))}
-              <button className="grid min-h-[300px] place-items-center rounded-2xl border border-dashed border-blue-200 bg-blue-50/40 text-center text-blue-600" type="button">
+              <button className="grid min-h-[300px] place-items-center rounded-2xl border border-dashed border-blue-200 bg-blue-50/40 text-center text-blue-600" type="button" onClick={() => setUploadOpen(true)}>
                 <div>
-                  <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-white shadow-soft">
-                    <Upload className="h-6 w-6" />
-                  </div>
+                  <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-white shadow-soft"><Upload className="h-6 w-6" /></div>
                   <div className="mt-3 text-sm font-black">导入本地视频</div>
                 </div>
               </button>
@@ -1221,31 +1317,21 @@ function WorksTemplatesPage({ initialTab, works, setWorks, handleQuickTemplate }
 
         <aside className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <h3 className="font-black text-slate-950">模板中心</h3>
-          <div className="relative mt-3">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none" placeholder="搜索模板名称" />
-          </div>
           <div className="mt-4 space-y-2 text-sm font-semibold text-slate-600">
-            {['全部模板', '热门推荐', '产品营销', '知识科普', '企业宣传', '电商带货', '活动促销', '教育培训'].map((item, index) => (
-              <button key={item} className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left ${index === 1 ? 'bg-white text-blue-700 shadow-sm' : 'hover:bg-white'}`} type="button">
+            {templateCategories.map((item) => (
+              <button key={item} className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left ${category === item ? 'bg-white text-blue-700 shadow-sm' : 'hover:bg-white'}`} type="button" onClick={() => { setTab('templates'); setCategory(item); }}>
                 <span>{item}</span>
-                {index === 1 ? <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs text-orange-600">热</span> : null}
               </button>
             ))}
           </div>
           <div className="mt-5">
             <h4 className="mb-3 text-sm font-black text-slate-950">热门模板</h4>
             {templates.slice(0, 2).map((template) => (
-              <button
-                key={template.id}
-                type="button"
-                onClick={() => handleQuickTemplate(template)}
-                className="mb-3 w-full overflow-hidden rounded-2xl bg-white text-left shadow-sm"
-              >
-                <div className={`h-20 bg-gradient-to-br ${template.color}`} />
+              <button key={template.id} type="button" onClick={() => applyTemplate(template)} className="mb-3 w-full overflow-hidden rounded-2xl bg-white text-left shadow-sm">
+                <img className="h-20 w-full object-cover" src={template.coverUrl} alt={template.name} />
                 <div className="p-3">
                   <div className="font-black text-slate-900">{template.name}</div>
-                  <div className="mt-1 text-xs text-slate-500">{template.category} · 竖屏 00:35</div>
+                  <div className="mt-1 text-xs text-slate-500">{template.category} · 竖屏模板</div>
                   <div className="mt-2 text-xs font-black text-blue-600">使用模板</div>
                 </div>
               </button>
@@ -1253,33 +1339,28 @@ function WorksTemplatesPage({ initialTab, works, setWorks, handleQuickTemplate }
           </div>
         </aside>
       </div>
+      {preview ? <VideoPreviewModal project={preview} onClose={() => setPreview(null)} /> : null}
+      {uploadOpen ? <UploadProjectModal avatars={avatars} voices={voices} refreshAll={refreshAll} setToast={setToast} onClose={() => setUploadOpen(false)} /> : null}
     </section>
   );
 }
 
-function TemplateGrid({ handleQuickTemplate }) {
+function TemplateGrid({ templates, applyTemplate }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {templates.map((template) => (
-        <button
-          key={template.id}
-          type="button"
-          onClick={() => handleQuickTemplate(template)}
-          className="overflow-hidden rounded-2xl border border-slate-200 bg-white text-left transition hover:-translate-y-0.5 hover:shadow-soft"
-        >
-          <div className={`relative h-44 bg-gradient-to-br ${template.color}`}>
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.34),transparent_34%)]" />
+        <button key={template.id} type="button" onClick={() => applyTemplate(template)} className="overflow-hidden rounded-2xl border border-slate-200 bg-white text-left transition hover:-translate-y-0.5 hover:shadow-soft">
+          <div className="relative h-44 bg-slate-100">
+            <img className="h-full w-full object-cover" src={template.coverUrl} alt={template.name} />
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/55" />
             <div className="absolute bottom-4 left-4 right-4 text-white">
               <div className="text-sm font-semibold opacity-90">{template.category}</div>
               <div className="mt-1 text-xl font-black">{template.name}</div>
             </div>
           </div>
           <div className="p-4">
-            <div className="text-sm text-slate-500">含镜头结构、字幕样式、口播节奏和默认竖屏画布。</div>
-            <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-2 text-sm font-black text-blue-700">
-              <Sparkles className="h-4 w-4" />
-              快速生成
-            </div>
+            <div className="text-sm text-slate-500">{template.scriptPrompt}</div>
+            <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-2 text-sm font-black text-blue-700"><Sparkles className="h-4 w-4" />快速生成</div>
           </div>
         </button>
       ))}
@@ -1287,31 +1368,27 @@ function TemplateGrid({ handleQuickTemplate }) {
   );
 }
 
-function WorkCard({ work, setWorks }) {
+function WorkCard({ project, onPreview, onDelete, onReuse }) {
   return (
     <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="relative aspect-[9/12] bg-slate-100">
-        <img className="h-full w-full object-cover" src={work.image} alt={work.title} />
-        <span className="absolute bottom-3 right-3 rounded-full bg-black/55 px-2 py-1 text-xs font-bold text-white">{work.duration}</span>
-        <input className="absolute left-3 top-3 h-4 w-4 rounded border-white accent-blue-600" type="checkbox" aria-label={`选择 ${work.title}`} />
-      </div>
+      <button className="relative aspect-[9/12] w-full bg-slate-100" type="button" onClick={() => onPreview(project)}>
+        <img className="h-full w-full object-cover" src={project.coverUrl} alt={project.title} />
+        <span className="absolute bottom-3 right-3 rounded-full bg-black/55 px-2 py-1 text-xs font-bold text-white">{project.duration}</span>
+      </button>
       <div className="p-3">
-        <div className="truncate font-black text-slate-950">{work.title}</div>
-        <div className="mt-1 text-xs text-slate-500">
-          {work.avatar} | {work.spec}
-        </div>
-        <div className="mt-1 text-xs text-slate-400">{work.createdAt}</div>
+        <div className="truncate font-black text-slate-950">{project.title}</div>
+        <div className="mt-1 text-xs text-slate-500">{project.avatar?.name || '-'} | {project.voice?.name || '-'} | {project.status}</div>
+        <div className="mt-1 text-xs text-slate-400">{formatDate(project.createdAt)}</div>
         <div className="mt-3 flex items-center justify-between">
           <div className="flex gap-1.5">
-            <IconButton icon={Play} label="预览" />
-            <IconButton icon={Download} label="下载" />
-            <IconButton icon={Share2} label="分享" />
+            <IconButton icon={Play} label="预览" onClick={() => onPreview(project)} />
+            <a className="grid h-8 w-8 place-items-center rounded-lg bg-slate-100 text-slate-500 hover:bg-blue-50 hover:text-blue-600" href={project.videoUrl} download title="下载">
+              <Download className="h-4 w-4" />
+            </a>
+            <IconButton icon={Copy} label="复用配置" onClick={() => onReuse(project)} />
+            <IconButton icon={Share2} label="复制链接" onClick={() => navigator.clipboard?.writeText(project.videoUrl)} />
           </div>
-          <button
-            className="rounded-lg px-2 py-1 text-xs font-black text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-            type="button"
-            onClick={() => setWorks((items) => items.filter((item) => item.id !== work.id))}
-          >
+          <button className="rounded-lg px-2 py-1 text-xs font-black text-slate-400 hover:bg-rose-50 hover:text-rose-600" type="button" onClick={() => onDelete(project)}>
             删除
           </button>
         </div>
@@ -1320,101 +1397,206 @@ function WorkCard({ work, setWorks }) {
   );
 }
 
+function UploadProjectModal({ avatars, voices, refreshAll, setToast, onClose }) {
+  const [title, setTitle] = useState('');
+  const [script, setScript] = useState('');
+  const [avatarId, setAvatarId] = useState(avatars[0]?.id || '');
+  const [voiceId, setVoiceId] = useState(voices.find((voice) => voice.status === 'ready')?.id || '');
+  const [file, setFile] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit(event) {
+    event.preventDefault();
+    if (!title.trim() || !script.trim() || !avatarId || !voiceId || !file) {
+      setToast('请完整填写作品信息并上传视频');
+      return;
+    }
+    const form = new FormData();
+    form.append('title', title);
+    form.append('script', script);
+    form.append('avatarId', avatarId);
+    form.append('voiceId', voiceId);
+    form.append('video', file);
+    setBusy(true);
+    try {
+      await apiFetch('/api/projects/upload', { method: 'POST', body: form });
+      setToast('作品已上传');
+      onClose();
+      refreshAll({ silent: true });
+    } catch (error) {
+      setToast(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal title="上传作品视频" onClose={onClose}>
+      <form className="space-y-3" onSubmit={submit}>
+        <TextField label="作品标题" value={title} onChange={setTitle} />
+        <label className="block">
+          <span className="mb-1 block text-xs font-bold text-slate-500">文案</span>
+          <textarea className="h-24 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none" value={script} onChange={(event) => setScript(event.target.value)} />
+        </label>
+        <SelectInput label="数字人" value={avatarId} options={avatars.map((item) => ({ value: item.id, label: item.name }))} onChange={setAvatarId} />
+        <SelectInput label="声音" value={voiceId} options={voices.filter((item) => item.status === 'ready').map((item) => ({ value: item.id, label: item.name }))} onChange={setVoiceId} />
+        <label className="block">
+          <span className="mb-1 block text-xs font-bold text-slate-500">视频文件</span>
+          <input className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" type="file" accept="video/*" onChange={(event) => setFile(event.target.files?.[0] || null)} />
+        </label>
+        <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-sm font-black text-white disabled:opacity-60" type="submit" disabled={busy}>
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          上传
+        </button>
+      </form>
+    </Modal>
+  );
+}
+
 function ApiPage() {
+  const endpoints = [
+    'GET /api/avatars', 'POST /api/avatars', 'PUT /api/avatars/:id', 'DELETE /api/avatars/:id',
+    'GET /api/voices', 'POST /api/voices', 'DELETE /api/voices/:id',
+    'GET /api/templates', 'POST /api/templates',
+    'GET /api/jobs', 'POST /api/jobs', 'GET /api/jobs/:id', 'POST /api/jobs/:id/cancel', 'POST /api/jobs/:id/retry',
+    'GET /api/projects', 'GET /api/projects/:id', 'DELETE /api/projects/:id',
+  ];
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-panel">
-      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
-        <div>
-          <h2 className="text-xl font-black text-slate-950">API</h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">通过 API Key 接入文案提交、数字人合成、任务状态查询和成品回调，适合把口播视频生成接入现有 CMS、CRM 或营销工具。</p>
-        </div>
-        <button className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white" type="button">
-          <Plus className="h-4 w-4" />
-          创建 Key
-        </button>
-      </div>
-      <div className="mt-6 grid gap-4 lg:grid-cols-3">
-        {[
-          ['RESTful API', '提交生成任务、查询任务进度、获取结果地址。'],
-          ['Webhook 回调', '合成完成、失败、取消等状态自动推送。'],
-          ['安全配额', '支持 IP 白名单、调用限额与积分消耗记录。'],
-        ].map(([title, text]) => (
-          <div key={title} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div className="font-black text-slate-950">{title}</div>
-            <div className="mt-2 text-sm leading-6 text-slate-500">{text}</div>
-          </div>
-        ))}
+      <h2 className="text-xl font-black text-slate-950">API</h2>
+      <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">当前 MVP 已接入 Express + Prisma SQLite，前端所有列表和操作均通过 API 完成。</p>
+      <div className="mt-6 grid gap-3 lg:grid-cols-2">
+        {endpoints.map((endpoint) => <div key={endpoint} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-sm text-slate-700">{endpoint}</div>)}
       </div>
     </section>
   );
 }
 
-function SettingsPage() {
+function SettingsPage({ setToast }) {
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-panel">
       <h2 className="text-xl font-black text-slate-950">设置</h2>
-      <p className="mt-1 text-sm text-slate-500">配置团队权限、默认输出规格、字幕样式和任务通知。</p>
+      <p className="mt-1 text-sm text-slate-500">MVP 默认输出竖屏视频，后续可接入真实模型配置。</p>
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         {[
           ['默认输出比例', '9:16 竖屏视频'],
-          ['字幕样式', '白字黑描边，高亮关键词'],
-          ['任务通知', '站内通知 + Webhook'],
-          ['团队权限', '管理员、运营、审核员'],
+          ['字幕样式', '从工作台表单保存到任务'],
+          ['任务通知', '前端轮询 / 可扩展 WebSocket'],
+          ['模型 Provider', '当前使用 mock-provider'],
         ].map(([label, value]) => (
-          <div key={label} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <button key={label} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left" type="button" onClick={() => setToast(`${label}：${value}`)}>
             <div className="font-black text-slate-800">{label}</div>
             <div className="text-sm text-slate-500">{value}</div>
-          </div>
+          </button>
         ))}
       </div>
     </section>
   );
 }
 
-function RecentTasks({ tasks }) {
+function RecentTasks({ tasks, setActiveView }) {
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-panel">
-      <h3 className="mb-3 font-black text-slate-950">最近任务</h3>
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="font-black text-slate-950">最近任务</h3>
+        <button className="text-xs font-black text-blue-600" type="button" onClick={() => setActiveView('tasks')}>查看全部</button>
+      </div>
       <div className="space-y-3">
         {tasks.map((task) => {
-          const status = statusMap[task.status];
+          const status = statusMap[task.status] || statusMap.pending;
           return (
             <div key={task.id} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3">
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-white text-blue-600">
-                <Video className="h-5 w-5" />
-              </div>
+              <div className="grid h-10 w-10 place-items-center rounded-xl bg-white text-blue-600"><Video className="h-5 w-5" /></div>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-black text-slate-800">{task.title}</div>
-                <div className="mt-1 h-1.5 rounded-full bg-white">
-                  <div className={`h-full rounded-full ${status.bar}`} style={{ width: `${task.progress}%` }} />
-                </div>
+                <div className="mt-1 h-1.5 rounded-full bg-white"><div className={`h-full rounded-full ${status.bar}`} style={{ width: `${task.progress}%` }} /></div>
               </div>
               <div className={`text-xs font-black ${status.color}`}>{status.label}</div>
             </div>
           );
         })}
+        {!tasks.length ? <EmptyNote text="暂无任务，创建视频后会出现在这里。" /> : null}
       </div>
     </div>
   );
 }
 
-function QuickWorks({ works }) {
+function QuickWorks({ projects, setActiveView }) {
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-panel">
-      <h3 className="mb-3 font-black text-slate-950">作品快捷入口</h3>
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="font-black text-slate-950">作品快捷入口</h3>
+        <button className="text-xs font-black text-blue-600" type="button" onClick={() => setActiveView('works')}>作品管理</button>
+      </div>
       <div className="space-y-3">
-        {works.map((work) => (
-          <div key={work.id} className="flex gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-2">
-            <img className="h-16 w-12 rounded-xl object-cover" src={work.image} alt={work.title} />
+        {projects.map((project) => (
+          <div key={project.id} className="flex gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-2">
+            <img className="h-16 w-12 rounded-xl object-cover" src={project.coverUrl} alt={project.title} />
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-black text-slate-800">{work.title}</div>
-              <div className="mt-1 text-xs text-slate-500">{work.spec}</div>
-              <button className="mt-2 text-xs font-black text-blue-600" type="button">
-                继续编辑
-              </button>
+              <div className="truncate text-sm font-black text-slate-800">{project.title}</div>
+              <div className="mt-1 text-xs text-slate-500">{project.duration} · {cnDate(project.createdAt)}</div>
+              <button className="mt-2 text-xs font-black text-blue-600" type="button" onClick={() => setActiveView('works')}>查看作品</button>
             </div>
           </div>
         ))}
+        {!projects.length ? <EmptyNote text="任务完成后会自动创建作品。" /> : null}
+      </div>
+    </div>
+  );
+}
+
+function JobDetailModal({ job, onClose }) {
+  const status = statusMap[job.status] || statusMap.pending;
+  return (
+    <Modal title="任务详情" onClose={onClose}>
+      <div className="space-y-3 text-sm">
+        <InfoRow label="任务 ID" value={job.id} />
+        <InfoRow label="任务名称" value={job.title} />
+        <InfoRow label="状态" value={status.label} />
+        <InfoRow label="阶段" value={job.stage} />
+        <InfoRow label="进度" value={`${job.progress}%`} />
+        <InfoRow label="数字人" value={job.avatar?.name || '-'} />
+        <InfoRow label="声音" value={job.voice?.name || '-'} />
+        <InfoRow label="字幕样式" value={job.subtitleStyle} />
+        <InfoRow label="背景设置" value={job.backgroundConfig} />
+        <InfoRow label="片头片尾" value={job.introOutroConfig} />
+        <div className="rounded-xl bg-slate-50 p-3 leading-6 text-slate-600">{job.script}</div>
+      </div>
+    </Modal>
+  );
+}
+
+function VideoPreviewModal({ project, onClose }) {
+  return (
+    <Modal title={project.title} onClose={onClose} wide>
+      <video className="max-h-[70vh] w-full rounded-2xl bg-black" src={project.videoUrl} controls poster={project.coverUrl} />
+      <div className="mt-3 flex items-center justify-between text-sm text-slate-500">
+        <span>{project.duration} · {project.avatar?.name}</span>
+        <a className="rounded-xl bg-blue-600 px-4 py-2 font-black text-white" href={project.videoUrl} download>下载视频</a>
+      </div>
+    </Modal>
+  );
+}
+
+function PreviewImageModal({ title, image, onClose }) {
+  return (
+    <Modal title={title} onClose={onClose}>
+      <img className="max-h-[70vh] w-full rounded-2xl object-cover" src={image} alt={title} />
+    </Modal>
+  );
+}
+
+function Modal({ title, onClose, children, wide = false }) {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4">
+      <div className={`max-h-[90vh] w-full overflow-auto rounded-3xl bg-white p-5 shadow-2xl ${wide ? 'max-w-4xl' : 'max-w-xl'}`}>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h3 className="text-lg font-black text-slate-950">{title}</h3>
+          <button className="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-500" type="button" onClick={onClose}>
+            <XCircle className="h-4 w-4" />
+          </button>
+        </div>
+        {children}
       </div>
     </div>
   );
@@ -1431,9 +1613,7 @@ function MetricCard({ icon: Icon, label, value, hint, tone = 'blue' }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between">
-        <div className={`grid h-10 w-10 place-items-center rounded-xl ${tones[tone]}`}>
-          <Icon className="h-5 w-5" />
-        </div>
+        <div className={`grid h-10 w-10 place-items-center rounded-xl ${tones[tone]}`}><Icon className="h-5 w-5" /></div>
         <span className="text-xs font-bold text-emerald-600">{hint}</span>
       </div>
       <div className="mt-3 text-sm font-semibold text-slate-500">{label}</div>
@@ -1442,59 +1622,30 @@ function MetricCard({ icon: Icon, label, value, hint, tone = 'blue' }) {
   );
 }
 
-function SelectLike({ label, value }) {
-  return (
-    <div>
-      <label className="mb-1 block text-xs font-bold text-slate-500">{label}</label>
-      <button className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-sm font-semibold text-slate-700" type="button">
-        <span className="truncate">{value}</span>
-        <ChevronDown className="h-4 w-4 text-slate-400" />
-      </button>
-    </div>
-  );
-}
-
 function SelectInput({ label, value, options, onChange }) {
+  const normalized = options.map((option) => (typeof option === 'string' ? { value: option, label: option } : option));
   return (
-    <label className="mt-3 block">
+    <label className="block">
       <span className="mb-1 block text-xs font-bold text-slate-500">{label}</span>
       <select className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none" value={value} onChange={(event) => onChange(event.target.value)}>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
+        {normalized.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
     </label>
   );
 }
 
-function RangeControl({ label, value, min, max, step = 1, suffix, onChange }) {
+function TextField({ label, value, onChange, placeholder = '' }) {
   return (
-    <label className="mt-3 block">
-      <div className="mb-1 flex justify-between text-xs font-bold text-slate-500">
-        <span>{label}</span>
-        <span>
-          {value}
-          {suffix}
-        </span>
-      </div>
-      <input
-        className="w-full accent-blue-600"
-        type="range"
-        value={value}
-        min={min}
-        max={max}
-        step={step}
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
+    <label className="block">
+      <span className="mb-1 block text-xs font-bold text-slate-500">{label}</span>
+      <input className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-100" value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
     </label>
   );
 }
 
-function FilterButton({ label, value }) {
+function FilterButton({ label, value, onClick }) {
   return (
-    <button className="inline-flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600" type="button">
+    <button className="inline-flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600" type="button" onClick={onClick}>
       <span>{label}</span>
       <span className="text-slate-400">{value}</span>
       <ChevronDown className="h-4 w-4 text-slate-400" />
@@ -1504,33 +1655,49 @@ function FilterButton({ label, value }) {
 
 function TabButton({ active, onClick, children }) {
   return (
-    <button
-      className={`-mb-px border-b-2 px-4 py-3 text-sm font-black transition ${
-        active ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-900'
-      }`}
-      type="button"
-      onClick={onClick}
-    >
+    <button className={`-mb-px border-b-2 px-4 py-3 text-sm font-black transition ${active ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-900'}`} type="button" onClick={onClick}>
       {children}
     </button>
   );
 }
 
-function IconButton({ icon: Icon, label }) {
+function IconButton({ icon: Icon, label, onClick, danger = false }) {
   return (
-    <button className="grid h-8 w-8 place-items-center rounded-lg bg-slate-100 text-slate-500 hover:bg-blue-50 hover:text-blue-600" type="button" aria-label={label} title={label}>
+    <button className={`grid h-8 w-8 place-items-center rounded-lg ${danger ? 'bg-rose-50 text-rose-600 hover:bg-rose-100' : 'bg-slate-100 text-slate-500 hover:bg-blue-50 hover:text-blue-600'}`} type="button" aria-label={label} title={label} onClick={onClick}>
       <Icon className="h-4 w-4" />
     </button>
   );
 }
 
-function Waveform({ seed = 3, compact = false }) {
-  const bars = Array.from({ length: compact ? 22 : 28 }, (_, index) => 8 + ((index * 7 + seed * 5) % (compact ? 18 : 28)));
+function Waveform({ seed = 3 }) {
+  const bars = Array.from({ length: 28 }, (_, index) => 8 + ((index * 7 + seed * 5) % 28));
   return (
-    <div className={`flex flex-1 items-center gap-1 ${compact ? 'h-7 max-w-36' : 'h-9'}`}>
-      {bars.map((height, index) => (
-        <span key={`${height}-${index}`} className="w-1 rounded-full bg-blue-500/80" style={{ height }} />
-      ))}
+    <div className="flex h-9 flex-1 items-center gap-1">
+      {bars.map((height, index) => <span key={`${height}-${index}`} className="w-1 rounded-full bg-blue-500/80" style={{ height }} />)}
+    </div>
+  );
+}
+
+function InfoRow({ label, value }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2">
+      <span className="font-bold text-slate-500">{label}</span>
+      <span className="text-right font-black text-slate-800">{value}</span>
+    </div>
+  );
+}
+
+function EmptyNote({ text }) {
+  return <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-sm font-semibold text-slate-400">{text}</div>;
+}
+
+function LoadingState() {
+  return (
+    <div className="grid min-h-[420px] place-items-center rounded-3xl border border-slate-200 bg-white shadow-panel">
+      <div className="flex items-center gap-3 text-sm font-bold text-slate-500">
+        <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+        正在读取 API 数据
+      </div>
     </div>
   );
 }
