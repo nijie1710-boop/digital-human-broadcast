@@ -1560,6 +1560,19 @@ function JobDetailModal({ job, onClose }) {
         <InfoRow label="字幕样式" value={job.subtitleStyle} />
         <InfoRow label="背景设置" value={job.backgroundConfig} />
         <InfoRow label="片头片尾" value={job.introOutroConfig} />
+        {job.logs?.length ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <div className="mb-2 text-xs font-black text-slate-500">任务步骤日志</div>
+            <div className="space-y-2">
+              {job.logs.map((log) => (
+                <div key={log.id} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 text-xs">
+                  <span className="font-black text-slate-700">{log.step}</span>
+                  <span className="text-slate-500">{log.progress}% · {log.status}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <div className="rounded-xl bg-slate-50 p-3 leading-6 text-slate-600">{job.script}</div>
       </div>
     </Modal>

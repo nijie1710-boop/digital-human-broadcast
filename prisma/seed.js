@@ -125,10 +125,15 @@ const templates = [
 ];
 
 async function main() {
-  await prisma.user.upsert({
-    where: { email: 'admin@example.com' },
-    update: {},
+  const user = await prisma.user.upsert({
+    where: { id: 'default-user' },
+    update: {
+      email: 'admin@example.com',
+      name: '运营小助手',
+      role: 'admin',
+    },
     create: {
+      id: 'default-user',
       email: 'admin@example.com',
       name: '运营小助手',
       role: 'admin',
@@ -138,24 +143,24 @@ async function main() {
   for (const avatar of avatars) {
     await prisma.avatar.upsert({
       where: { id: avatar.id },
-      update: avatar,
-      create: avatar,
+      update: { ...avatar, userId: user.id },
+      create: { ...avatar, userId: user.id },
     });
   }
 
   for (const voice of voices) {
     await prisma.voice.upsert({
       where: { id: voice.id },
-      update: voice,
-      create: voice,
+      update: { ...voice, userId: user.id },
+      create: { ...voice, userId: user.id },
     });
   }
 
   for (const template of templates) {
     await prisma.template.upsert({
       where: { id: template.id },
-      update: template,
-      create: template,
+      update: { ...template, userId: user.id },
+      create: { ...template, userId: user.id },
     });
   }
 }
