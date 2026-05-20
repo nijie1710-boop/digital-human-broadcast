@@ -215,21 +215,28 @@ export class JobRunner {
 
   async ensureProject(job) {
     const existing = await this.prisma.project.findUnique({ where: { jobId: job.id } });
-    if (existing) return existing;
+    const data = {
+      userId: job.userId,
+      title: job.title,
+      script: job.script,
+      avatarId: job.avatarId,
+      voiceId: job.voiceId,
+      jobId: job.id,
+      videoUrl: job.resultVideoUrl,
+      coverUrl: job.coverUrl || job.avatar.previewImage,
+      duration: job.duration || estimateDuration(job.script),
+      status: 'ready',
+    };
+
+    if (existing) {
+      return this.prisma.project.update({
+        where: { id: existing.id },
+        data,
+      });
+    }
 
     return this.prisma.project.create({
-      data: {
-        userId: job.userId,
-        title: job.title,
-        script: job.script,
-        avatarId: job.avatarId,
-        voiceId: job.voiceId,
-        jobId: job.id,
-        videoUrl: job.resultVideoUrl,
-        coverUrl: job.coverUrl || job.avatar.previewImage,
-        duration: job.duration || estimateDuration(job.script),
-        status: 'ready',
-      },
+      data,
     });
   }
 
