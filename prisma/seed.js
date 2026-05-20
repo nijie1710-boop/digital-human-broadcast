@@ -1,6 +1,17 @@
 import { PrismaClient } from '@prisma/client';
+import { execFile as execFileCallback } from 'node:child_process';
+import fs from 'node:fs';
+import fsp from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 
 const prisma = new PrismaClient();
+const execFile = promisify(execFileCallback);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const rootDir = path.resolve(__dirname, '..');
+const samplesDir = path.join(rootDir, 'public/samples');
 
 const avatars = [
   {
@@ -42,8 +53,8 @@ const voices = [
     gender: '女性',
     language: '普通话',
     style: '活力亲切',
-    sampleUrl: 'https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3',
-    duration: '00:15',
+    sampleUrl: '/samples/ruxia.m4a',
+    duration: '00:06',
     status: 'ready',
     isDefault: true,
   },
@@ -53,8 +64,8 @@ const voices = [
     gender: '女性',
     language: '普通话',
     style: '温暖知性',
-    sampleUrl: 'https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3',
-    duration: '00:15',
+    sampleUrl: '/samples/jingyi.m4a',
+    duration: '00:06',
     status: 'ready',
     isDefault: false,
   },
@@ -64,10 +75,28 @@ const voices = [
     gender: '男性',
     language: '普通话',
     style: '沉稳专业',
-    sampleUrl: 'https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3',
-    duration: '00:15',
+    sampleUrl: '/samples/chunchen.m4a',
+    duration: '00:06',
     status: 'ready',
     isDefault: false,
+  },
+];
+
+const voiceSamples = [
+  {
+    fileName: 'ruxia.m4a',
+    voice: 'Tingting',
+    text: '大家好，我是如夏。这是一段活力亲切的数字人口播声音样本。',
+  },
+  {
+    fileName: 'jingyi.m4a',
+    voice: 'Tingting',
+    text: '大家好，我是静怡。这是一段温暖知性的数字人口播声音样本。',
+  },
+  {
+    fileName: 'chunchen.m4a',
+    voice: 'Reed (中文（中国大陆）)',
+    text: '大家好，我是春辰。这是一段沉稳专业的数字人口播声音样本。',
   },
 ];
 
@@ -125,6 +154,8 @@ const templates = [
 ];
 
 async function main() {
+  await ensureSeedVoiceSamples();
+
   const user = await prisma.user.upsert({
     where: { id: 'default-user' },
     update: {
@@ -162,6 +193,31 @@ async function main() {
       update: { ...template, userId: user.id },
       create: { ...template, userId: user.id },
     });
+  }
+}
+
+async function ensureSeedVoiceSamples() {
+  await fsp.mkdir(samplesDir, { recursive: true });
+
+  for (const sample of voiceSamples) {
+    const outputPath = path.join(samplesDir, sample.fileName);
+    if (fs.existsSync(outputPath)) continue;
+
+    const aiffPath = path.join(samplesDir, sample.fileName.replace(/\.m4a$/i, '.aiff'));
+    try {
+      await execFile('say', ['-v', sample.voice, '-r', '178', '-o', aiffPath, sample.text], { timeout: 60000 });
+      await execFile('ffmpeg', ['-y', '-i', aiffPath, '-c:a', 'aac', '-b:a', '128k', outputPath], { timeout: 60000 });
+    } finally {
+      await safeUnlink(aiffPath);
+    }
+  }
+}
+
+async function safeUnlink(filePath) {
+  try {
+    await fsp.unlink(filePath);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
   }
 }
 

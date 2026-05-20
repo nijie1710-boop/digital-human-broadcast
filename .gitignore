@@ -4,6 +4,8 @@ prisma/dev.db
 prisma/dev.db-journal
 public/uploads/*
 !public/uploads/.gitkeep
+public/samples/*
+!public/samples/.gitkeep
 .DS_Store
 .env
 .env.*

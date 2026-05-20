@@ -266,7 +266,8 @@ app.get('/api/voices', asyncHandler(async (req, res) => {
 app.post('/api/voices', upload.single('sample'), asyncHandler(async (req, res) => {
   const userId = await currentUserId(req);
   requireFields(req.body, ['name', 'gender', 'language', 'style']);
-  const sampleUrl = fileUrl(req.file) || req.body.sampleUrl || 'https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3';
+  const sampleUrl = fileUrl(req.file) || req.body.sampleUrl;
+  if (!sampleUrl) return res.status(400).json({ error: '请上传声音样本文件' });
   if (parseBool(req.body.isDefault)) await prisma.voice.updateMany({ where: { userId }, data: { isDefault: false } });
 
   const voice = await prisma.voice.create({

@@ -1082,8 +1082,8 @@ function VoiceModal({ onClose, refreshAll, setToast, setSelectedVoiceId }) {
         <TextField label="语言" value={language} onChange={setLanguage} />
         <TextField label="风格" value={style} onChange={setStyle} />
         <label className="block">
-          <span className="mb-1 block text-xs font-bold text-slate-500">声音样本 mp3/wav</span>
-          <input className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" type="file" accept="audio/mp3,audio/mpeg,audio/wav,audio/x-wav" onChange={(event) => setFile(event.target.files?.[0] || null)} />
+          <span className="mb-1 block text-xs font-bold text-slate-500">声音样本 mp3/wav/m4a</span>
+          <input className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" type="file" accept="audio/mp3,audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/x-m4a,.m4a" onChange={(event) => setFile(event.target.files?.[0] || null)} />
         </label>
         <label className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600">
           <input type="checkbox" checked={clone} onChange={(event) => setClone(event.target.checked)} />
