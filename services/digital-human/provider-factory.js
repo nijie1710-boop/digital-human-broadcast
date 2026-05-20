@@ -1,3 +1,4 @@
+import { DIDProvider } from './did-provider.js';
 import { MockDigitalHumanProvider } from './mock-provider.js';
 
 export function createDigitalHumanProvider(name = 'mock') {
@@ -7,5 +8,9 @@ export function createDigitalHumanProvider(name = 'mock') {
     return new MockDigitalHumanProvider();
   }
 
-  throw new Error(`Unsupported DIGITAL_HUMAN_PROVIDER: ${name}. Only "mock" is available in this MVP.`);
+  if (['did', 'd-id', 'd_id'].includes(providerName)) {
+    return new DIDProvider();
+  }
+
+  throw new Error(`Unsupported DIGITAL_HUMAN_PROVIDER: ${name}. Use "mock" or "did".`);
 }

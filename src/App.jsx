@@ -1137,7 +1137,7 @@ function TaskCenterPage({ jobs, refreshAll, setToast }) {
       <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-panel">
         <div className="mb-4">
           <h2 className="text-xl font-black text-slate-950">任务中心</h2>
-          <p className="mt-1 text-sm text-slate-500">任务来自 generation_jobs 表，状态由 mock provider 推进。</p>
+          <p className="mt-1 text-sm text-slate-500">任务来自 generation_jobs 表，状态由当前 provider 推进。</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           {stats.map((item) => <MetricCard key={item.label} {...item} />)}
@@ -1476,13 +1476,13 @@ function SettingsPage({ setToast }) {
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-panel">
       <h2 className="text-xl font-black text-slate-950">设置</h2>
-      <p className="mt-1 text-sm text-slate-500">MVP 默认输出竖屏视频，后续可接入真实模型配置。</p>
+      <p className="mt-1 text-sm text-slate-500">默认输出竖屏视频；mock 为离线兜底，did 为真实口型驱动生成。</p>
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         {[
           ['默认输出比例', '9:16 竖屏视频'],
           ['字幕样式', '从工作台表单保存到任务'],
           ['任务通知', '前端轮询 / 可扩展 WebSocket'],
-          ['模型 Provider', '当前使用 mock-provider'],
+          ['模型 Provider', 'DIGITAL_HUMAN_PROVIDER=mock 或 did'],
         ].map(([label, value]) => (
           <button key={label} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left" type="button" onClick={() => setToast(`${label}：${value}`)}>
             <div className="font-black text-slate-800">{label}</div>
