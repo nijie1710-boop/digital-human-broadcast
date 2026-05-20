@@ -15,14 +15,16 @@ const ALIYUN_STAGES = [
   { afterSeconds: 2, progress: 30, status: 'running', step: 'TTS 语音生成中', action: 'synthesizeSpeech' },
   { afterSeconds: 4, progress: 45, status: 'running', step: '数字人图片检测', action: 'validateAvatarImage' },
   { afterSeconds: 6, progress: 60, status: 'running', step: '提交 wan2.2-s2v 任务', action: 'animateAvatar' },
-  { afterSeconds: 8, progress: 80, status: 'running', step: '等待视频生成', action: 'composeVideo' },
+  { afterSeconds: 8, progress: 80, status: 'running', step: '等待视频生成', action: 'composeVideo', repeatUntilVideo: true },
 ];
 
 function resolveStage(job) {
   const stages = stagesForProvider(job.provider);
   const baseTime = job.startedAt || job.createdAt;
   const elapsedSeconds = Math.floor((Date.now() - new Date(baseTime).getTime()) / 1000);
-  return stages.reduce((current, stage) => (elapsedSeconds >= stage.afterSeconds ? stage : current), stages[0]);
+  const nextSequentialStage = stages.find((stage) => elapsedSeconds >= stage.afterSeconds && stage.progress > job.progress);
+  if (nextSequentialStage) return nextSequentialStage;
+  return stages.find((stage) => stage.progress === job.progress) || stages[0];
 }
 
 function stagesForProvider(provider) {
@@ -176,7 +178,8 @@ export class JobRunner {
 
   async advanceJob(job) {
     const next = resolveStage(job);
-    if (next.progress <= job.progress && next.status === job.status && next.step === job.stage) {
+    const shouldRepeatStage = next.repeatUntilVideo && job.status === 'running' && job.progress === next.progress && !job.resultVideoUrl;
+    if (!shouldRepeatStage && next.progress <= job.progress && next.status === job.status && next.step === job.stage) {
       return;
     }
 

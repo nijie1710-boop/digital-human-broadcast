@@ -115,7 +115,21 @@ export class AliyunProvider extends DigitalHumanProvider {
       throw new Error('缺少阿里 wan2.2-s2v taskId，无法获取生成结果');
     }
 
-    const result = await this.waitForVideo(taskId);
+    const result = await this.fetchVideoStatus(taskId);
+    const status = result.output?.task_status || result.task_status || result.status;
+    if (!['SUCCEEDED', 'SUCCESS', 'succeeded'].includes(status)) {
+      if (['FAILED', 'CANCELED', 'UNKNOWN', 'failed', 'canceled'].includes(status)) {
+        throw new Error(aliyunErrorMessage(result, `阿里视频任务失败：${status}`));
+      }
+      const pendingArtifact = {
+        providerTaskId: taskId,
+        providerStatus: status || 'RUNNING',
+        providerPayload: result,
+      };
+      this.mergeArtifact(job.id, pendingArtifact);
+      return pendingArtifact;
+    }
+
     const videoUrl = findVideoUrl(result);
     if (!videoUrl) {
       throw new Error(`阿里视频任务已完成，但没有找到 videoUrl：${safeStringify(result).slice(0, 220)}`);
@@ -132,24 +146,8 @@ export class AliyunProvider extends DigitalHumanProvider {
     return nextArtifact;
   }
 
-  async waitForVideo(taskId) {
-    const timeoutMs = Number(process.env.ALIYUN_TASK_TIMEOUT_MS || 10 * 60 * 1000);
-    const intervalMs = Number(process.env.ALIYUN_TASK_POLL_INTERVAL_MS || 8000);
-    const startedAt = Date.now();
-
-    while (Date.now() - startedAt < timeoutMs) {
-      await sleep(intervalMs);
-      const response = await this.request(`/tasks/${encodeURIComponent(taskId)}`);
-      const status = response.output?.task_status || response.task_status || response.status;
-      if (['SUCCEEDED', 'SUCCESS', 'succeeded'].includes(status)) {
-        return response;
-      }
-      if (['FAILED', 'CANCELED', 'UNKNOWN', 'failed', 'canceled'].includes(status)) {
-        throw new Error(aliyunErrorMessage(response, `阿里视频任务失败：${status}`));
-      }
-    }
-
-    throw new Error('阿里视频生成超时，请稍后重试或检查百炼控制台任务状态');
+  async fetchVideoStatus(taskId) {
+    return this.request(`/tasks/${encodeURIComponent(taskId)}`);
   }
 
   async request(endpoint, { method = 'GET', json, asyncTask = false } = {}) {
@@ -285,8 +283,4 @@ function parseJson(text) {
   } catch {
     return { message: text };
   }
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
