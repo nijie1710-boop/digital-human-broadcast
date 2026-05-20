@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  role      String   @default("admin")
+  createdAt DateTime @default(now())
+}
+
+model Avatar {
+  id           String          @id @default(uuid())
+  name         String
+  gender       String
+  style        String
+  previewImage String
+  sourceImage  String
+  status       String          @default("active")
+  isDefault    Boolean         @default(false)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  jobs         GenerationJob[]
+  projects     Project[]
+}
+
+model Voice {
+  id         String          @id @default(uuid())
+  name       String
+  gender     String
+  language   String
+  style      String
+  sampleUrl  String
+  duration   String
+  status     String          @default("ready")
+  isDefault  Boolean         @default(false)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  jobs       GenerationJob[]
+  projects   Project[]
+}
+
+model Template {
+  id                String   @id @default(uuid())
+  name              String
+  category          String
+  coverUrl          String
+  scriptPrompt      String
+  subtitleStyle     String
+  backgroundConfig  String
+  introOutroConfig  String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model GenerationJob {
+  id               String    @id @default(uuid())
+  title            String
+  script           String
+  avatarId         String
+  voiceId          String
+  subtitleStyle    String
+  backgroundConfig String
+  introOutroConfig String
+  status           String    @default("pending")
+  progress         Int       @default(0)
+  stage            String    @default("创建任务")
+  errorMessage     String?
+  resultVideoUrl   String?
+  coverUrl         String?
+  duration         String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  startedAt        DateTime?
+  finishedAt       DateTime?
+  avatar           Avatar    @relation(fields: [avatarId], references: [id])
+  voice            Voice     @relation(fields: [voiceId], references: [id])
+  project          Project?
+}
+
+model Project {
+  id        String         @id @default(uuid())
+  title     String
+  script    String
+  avatarId  String
+  voiceId   String
+  jobId     String?        @unique
+  videoUrl  String
+  coverUrl  String
+  duration  String
+  status    String         @default("ready")
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  avatar    Avatar         @relation(fields: [avatarId], references: [id])
+  voice     Voice          @relation(fields: [voiceId], references: [id])
+  job       GenerationJob? @relation(fields: [jobId], references: [id])
+}
