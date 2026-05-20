@@ -20,8 +20,10 @@ const { PrismaClient } = await import('@prisma/client');
 const prisma = new PrismaClient();
 await ensureDefaultUser();
 
-const provider = createDigitalHumanProvider(process.env.DIGITAL_HUMAN_PROVIDER || 'mock');
-const jobRunner = new JobRunner({ prisma, provider });
+const rawProviderName = String(process.env.DIGITAL_HUMAN_PROVIDER || 'mock').toLowerCase();
+const providerName = ['dashscope', 'bailian'].includes(rawProviderName) ? 'aliyun' : rawProviderName;
+const provider = createDigitalHumanProvider(providerName);
+const jobRunner = new JobRunner({ prisma, provider, providerName });
 const app = express();
 
 app.use(express.json({ limit: '2mb' }));
@@ -177,7 +179,15 @@ async function setDefault(model, id, userId) {
 }
 
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, provider: process.env.DIGITAL_HUMAN_PROVIDER || 'mock' });
+  res.json({
+    ok: true,
+    provider: providerName,
+    aliyun: {
+      configured: Boolean(process.env.ALIYUN_DASHSCOPE_API_KEY || process.env.DASHSCOPE_API_KEY),
+      publicBaseUrlConfigured: Boolean(process.env.PUBLIC_BASE_URL),
+      region: process.env.ALIYUN_MODEL_REGION || 'beijing',
+    },
+  });
 });
 
 app.get('/api/avatars', asyncHandler(async (req, res) => {
@@ -348,6 +358,9 @@ app.post('/api/jobs', asyncHandler(async (req, res) => {
   requireFields(req.body, ['script', 'avatarId', 'voiceId']);
   const script = req.body.script.trim();
   if (script.length > 3000) return res.status(400).json({ error: '文案不能超过 3000 字' });
+  if (providerName === 'aliyun' && !(process.env.ALIYUN_DASHSCOPE_API_KEY || process.env.DASHSCOPE_API_KEY)) {
+    return res.status(400).json({ error: '未配置阿里 API Key，请设置 ALIYUN_DASHSCOPE_API_KEY' });
+  }
 
   const [avatar, voice] = await Promise.all([
     prisma.avatar.findFirst({ where: { id: req.body.avatarId, userId, NOT: { status: 'deleted' } } }),
@@ -359,6 +372,7 @@ app.post('/api/jobs', asyncHandler(async (req, res) => {
 
   const job = await jobRunner.enqueueJob({
     userId,
+    provider: providerName,
     title: req.body.title?.trim() || makeTitle(script),
     script,
     avatarId: avatar.id,

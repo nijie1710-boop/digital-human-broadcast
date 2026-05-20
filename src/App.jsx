@@ -103,6 +103,7 @@ function App() {
   const [templates, setTemplates] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [systemConfig, setSystemConfig] = useState({ provider: 'mock' });
   const [script, setScript] = useState(defaultScript);
   const [selectedAvatarId, setSelectedAvatarId] = useState('');
   const [selectedVoiceId, setSelectedVoiceId] = useState('');
@@ -117,13 +118,15 @@ function App() {
   async function refreshAll({ silent = false } = {}) {
     if (!silent) setLoading(true);
     try {
-      const [avatarData, voiceData, templateData, jobData, projectData] = await Promise.all([
+      const [healthData, avatarData, voiceData, templateData, jobData, projectData] = await Promise.all([
+        apiFetch('/api/health'),
         apiFetch('/api/avatars'),
         apiFetch('/api/voices'),
         apiFetch('/api/templates'),
         apiFetch('/api/jobs'),
         apiFetch('/api/projects'),
       ]);
+      setSystemConfig(healthData);
       setAvatars(avatarData);
       setVoices(voiceData);
       setTemplates(templateData);
@@ -217,6 +220,10 @@ function App() {
     }
     if (selectedVoice?.status !== 'ready') {
       setToast('当前声音还在克隆处理中，请稍后再试');
+      return;
+    }
+    if (systemConfig.provider === 'aliyun' && !systemConfig.aliyun?.configured) {
+      setToast('未配置阿里 API Key，请设置 ALIYUN_DASHSCOPE_API_KEY');
       return;
     }
 
@@ -332,7 +339,7 @@ function App() {
     }
 
     if (activeView === 'api') return <ApiPage />;
-    return <SettingsPage setToast={setToast} />;
+    return <SettingsPage setToast={setToast} systemConfig={systemConfig} />;
   }, [
     activeView,
     avatars,
@@ -347,6 +354,7 @@ function App() {
     selectedVoice,
     selectedVoiceId,
     subtitleStyle,
+    systemConfig,
     templates,
     voices,
   ]);
@@ -1472,17 +1480,20 @@ function ApiPage() {
   );
 }
 
-function SettingsPage({ setToast }) {
+function SettingsPage({ setToast, systemConfig }) {
+  const providerLabel = systemConfig.provider === 'aliyun'
+    ? `aliyun · ${systemConfig.aliyun?.configured ? 'API Key 已配置' : '缺少 API Key'}`
+    : systemConfig.provider;
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-panel">
       <h2 className="text-xl font-black text-slate-950">设置</h2>
-      <p className="mt-1 text-sm text-slate-500">默认输出竖屏视频；mock 为离线兜底，did 为真实口型驱动生成。</p>
+      <p className="mt-1 text-sm text-slate-500">默认输出竖屏视频；mock 为离线兜底，aliyun 为百炼真实口型驱动生成。</p>
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         {[
           ['默认输出比例', '9:16 竖屏视频'],
           ['字幕样式', '从工作台表单保存到任务'],
           ['任务通知', '前端轮询 / 可扩展 WebSocket'],
-          ['模型 Provider', 'DIGITAL_HUMAN_PROVIDER=mock 或 did'],
+          ['模型 Provider', providerLabel],
         ].map(([label, value]) => (
           <button key={label} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left" type="button" onClick={() => setToast(`${label}：${value}`)}>
             <div className="font-black text-slate-800">{label}</div>
@@ -1555,11 +1566,19 @@ function JobDetailModal({ job, onClose }) {
         <InfoRow label="状态" value={status.label} />
         <InfoRow label="阶段" value={job.stage} />
         <InfoRow label="进度" value={`${job.progress}%`} />
+        <InfoRow label="Provider" value={job.provider || 'mock'} />
+        {job.providerTaskId ? <InfoRow label="Provider Task ID" value={job.providerTaskId} /> : null}
+        {job.audioUrl ? <InfoRow label="音频 URL" value={job.audioUrl} /> : null}
         <InfoRow label="数字人" value={job.avatar?.name || '-'} />
         <InfoRow label="声音" value={job.voice?.name || '-'} />
         <InfoRow label="字幕样式" value={job.subtitleStyle} />
         <InfoRow label="背景设置" value={job.backgroundConfig} />
         <InfoRow label="片头片尾" value={job.introOutroConfig} />
+        {job.errorMessage ? (
+          <div className="rounded-xl border border-rose-100 bg-rose-50 p-3 text-rose-700">
+            {job.errorMessage}
+          </div>
+        ) : null}
         {job.logs?.length ? (
           <div className="rounded-xl border border-slate-200 bg-white p-3">
             <div className="mb-2 text-xs font-black text-slate-500">任务步骤日志</div>

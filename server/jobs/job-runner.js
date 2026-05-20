@@ -1,6 +1,6 @@
 import { estimateDuration } from '../../services/digital-human/provider.js';
 
-const STAGES = [
+const MOCK_STAGES = [
   { afterSeconds: 0, progress: 0, status: 'pending', step: '创建任务' },
   { afterSeconds: 2, progress: 20, status: 'running', step: 'TTS 生成', action: 'synthesizeSpeech' },
   { afterSeconds: 5, progress: 45, status: 'running', step: '数字人驱动', action: 'animateAvatar' },
@@ -9,16 +9,50 @@ const STAGES = [
   { afterSeconds: 14, progress: 100, status: 'success', step: '完成', action: 'composeVideo' },
 ];
 
+const ALIYUN_STAGES = [
+  { afterSeconds: 0, progress: 0, status: 'pending', step: '创建任务' },
+  { afterSeconds: 1, progress: 15, status: 'running', step: '准备文案' },
+  { afterSeconds: 2, progress: 30, status: 'running', step: 'TTS 语音生成中', action: 'synthesizeSpeech' },
+  { afterSeconds: 4, progress: 45, status: 'running', step: '数字人图片检测', action: 'validateAvatarImage' },
+  { afterSeconds: 6, progress: 60, status: 'running', step: '提交 wan2.2-s2v 任务', action: 'animateAvatar' },
+  { afterSeconds: 8, progress: 80, status: 'running', step: '等待视频生成', action: 'composeVideo' },
+];
+
 function resolveStage(job) {
+  const stages = stagesForProvider(job.provider);
   const baseTime = job.startedAt || job.createdAt;
   const elapsedSeconds = Math.floor((Date.now() - new Date(baseTime).getTime()) / 1000);
-  return STAGES.reduce((current, stage) => (elapsedSeconds >= stage.afterSeconds ? stage : current), STAGES[0]);
+  return stages.reduce((current, stage) => (elapsedSeconds >= stage.afterSeconds ? stage : current), stages[0]);
+}
+
+function stagesForProvider(provider) {
+  return provider === 'aliyun' ? ALIYUN_STAGES : MOCK_STAGES;
+}
+
+function providerResultToJobData(result) {
+  if (!result) return {};
+  const data = {};
+  if (result.providerTaskId) data.providerTaskId = result.providerTaskId;
+  if (result.providerStatus) data.providerStatus = result.providerStatus;
+  if (result.audioUrl) data.audioUrl = result.audioUrl;
+  if (result.videoUrl) data.videoUrl = result.videoUrl;
+  if (result.providerPayload) data.providerPayload = stringifyPayload(result.providerPayload);
+  return data;
+}
+
+function stringifyPayload(value) {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
 }
 
 export class JobRunner {
-  constructor({ prisma, provider, intervalMs = 1500 }) {
+  constructor({ prisma, provider, providerName = 'mock', intervalMs = 1500 }) {
     this.prisma = prisma;
     this.provider = provider;
+    this.providerName = providerName;
     this.intervalMs = intervalMs;
     this.timer = null;
     this.running = false;
@@ -42,6 +76,7 @@ export class JobRunner {
     const job = await this.prisma.generationJob.create({
       data: {
         ...payload,
+        provider: payload.provider || this.providerName,
         status: 'pending',
         progress: 0,
         stage: '创建任务',
@@ -97,6 +132,11 @@ export class JobRunner {
         errorMessage: null,
         resultVideoUrl: null,
         coverUrl: null,
+        providerTaskId: null,
+        providerStatus: null,
+        providerPayload: null,
+        audioUrl: null,
+        videoUrl: null,
         startedAt: new Date(),
         finishedAt: null,
       },
@@ -141,31 +181,51 @@ export class JobRunner {
     }
 
     try {
-      const providerResult = await this.runProviderAction(job, next);
+      const preActionStatus = next.action && next.status === 'success' ? 'running' : next.status;
+      const preActionProgress = next.action && next.status === 'success' ? Math.max(job.progress, next.progress - 1) : next.progress;
+      const activeJob = await this.prisma.generationJob.update({
+        where: { id: job.id },
+        data: {
+          status: preActionStatus,
+          progress: preActionProgress,
+          stage: next.step,
+          startedAt: job.startedAt || new Date(),
+        },
+        include: { avatar: true, voice: true, project: true, logs: true },
+      });
+
+      const providerResult = await this.runProviderAction(activeJob, next);
+      const providerData = providerResultToJobData(providerResult);
+      const shouldComplete = next.status === 'success' || (next.action === 'composeVideo' && providerResult?.videoUrl);
       const data = {
+        ...providerData,
         status: next.status,
         progress: next.progress,
         stage: next.step,
-        startedAt: job.startedAt || new Date(),
+        startedAt: activeJob.startedAt || new Date(),
       };
 
-      if (next.status === 'success') {
+      if (shouldComplete) {
+        data.status = 'success';
+        data.progress = 100;
+        data.stage = job.provider === 'aliyun' ? '生成完成' : next.step;
         data.finishedAt = new Date();
-        data.resultVideoUrl = providerResult?.videoUrl || job.resultVideoUrl;
-        data.coverUrl = providerResult?.coverUrl || job.coverUrl || job.avatar.previewImage;
-        data.duration = providerResult?.duration || job.duration || estimateDuration(job.script);
+        data.resultVideoUrl = providerResult?.videoUrl || activeJob.resultVideoUrl;
+        data.videoUrl = providerResult?.videoUrl || providerData.videoUrl || activeJob.videoUrl;
+        data.coverUrl = providerResult?.coverUrl || activeJob.coverUrl || activeJob.avatar.previewImage;
+        data.duration = providerResult?.duration || activeJob.duration || estimateDuration(activeJob.script);
       }
 
       const updatedJob = await this.prisma.generationJob.update({
-        where: { id: job.id },
+        where: { id: activeJob.id },
         data,
         include: { avatar: true, voice: true, project: true, logs: true },
       });
 
       await this.createLog(updatedJob, {
-        step: next.step,
-        status: next.status === 'success' ? 'success' : 'running',
-        progress: next.progress,
+        step: updatedJob.stage,
+        status: shouldComplete ? 'success' : 'running',
+        progress: updatedJob.progress,
         message: `${next.step}完成`,
       });
 
@@ -194,8 +254,8 @@ export class JobRunner {
 
   async runProviderAction(job, stage) {
     if (!stage.action) return null;
-    if (stage.action === 'composeVideo') {
-      return this.provider.composeVideo({ job });
+    if (typeof this.provider[stage.action] !== 'function') {
+      throw new Error(`当前 provider 不支持 ${stage.action}`);
     }
     return this.provider[stage.action]({ job });
   }
@@ -222,7 +282,7 @@ export class JobRunner {
       avatarId: job.avatarId,
       voiceId: job.voiceId,
       jobId: job.id,
-      videoUrl: job.resultVideoUrl,
+      videoUrl: job.resultVideoUrl || job.videoUrl,
       coverUrl: job.coverUrl || job.avatar.previewImage,
       duration: job.duration || estimateDuration(job.script),
       status: 'ready',

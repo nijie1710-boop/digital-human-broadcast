@@ -87,6 +87,12 @@ model GenerationJob {
   subtitleStyle    String
   backgroundConfig String
   introOutroConfig String
+  provider         String    @default("mock")
+  providerTaskId   String?
+  providerStatus   String?
+  providerPayload  String?
+  audioUrl         String?
+  videoUrl         String?
   status           String    @default("pending")
   progress         Int       @default(0)
   stage            String    @default("创建任务")
