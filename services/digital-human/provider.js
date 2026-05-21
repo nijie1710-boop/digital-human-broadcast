@@ -14,6 +14,10 @@ export class DigitalHumanProvider {
   async composeVideo() {
     throw new Error(`${this.constructor.name}.composeVideo is not configured`);
   }
+
+  async cloneVoice() {
+    throw new Error(`${this.constructor.name}.cloneVoice is not configured`);
+  }
 }
 
 export function estimateDuration(script) {

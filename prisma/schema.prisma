@@ -49,6 +49,12 @@ model Voice {
   style      String
   sampleUrl  String
   duration   String
+  provider   String          @default("mock")
+  providerVoiceId String?
+  providerModel   String?
+  providerStatus  String?
+  providerPayload String?
+  providerError   String?
   status     String          @default("ready")
   isDefault  Boolean         @default(false)
   createdAt  DateTime        @default(now())

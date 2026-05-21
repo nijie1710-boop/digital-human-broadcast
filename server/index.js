@@ -291,9 +291,13 @@ app.post('/api/voices', upload.single('sample'), asyncHandler(async (req, res) =
   requireFields(req.body, ['name', 'gender', 'language', 'style']);
   const sampleUrl = fileUrl(req.file) || req.body.sampleUrl;
   if (!sampleUrl) return res.status(400).json({ error: '请上传声音样本文件' });
-  if (parseBool(req.body.isDefault)) await prisma.voice.updateMany({ where: { userId }, data: { isDefault: false } });
+  const shouldClone = parseBool(req.body.clone);
+  if (shouldClone && req.file?.size > 10 * 1024 * 1024) {
+    return res.status(400).json({ error: '声音克隆样本建议不超过 10MB，请上传 10-30 秒干净人声' });
+  }
+  if (parseBool(req.body.isDefault) && !shouldClone) await prisma.voice.updateMany({ where: { userId }, data: { isDefault: false } });
 
-  const voice = await prisma.voice.create({
+  let voice = await prisma.voice.create({
     data: {
       userId,
       name: req.body.name.trim(),
@@ -302,10 +306,46 @@ app.post('/api/voices', upload.single('sample'), asyncHandler(async (req, res) =
       style: req.body.style.trim(),
       sampleUrl,
       duration: req.body.duration || '00:15',
-      status: parseBool(req.body.clone) ? 'pending' : 'ready',
-      isDefault: parseBool(req.body.isDefault),
+      provider: shouldClone ? providerName : 'mock',
+      status: shouldClone ? 'pending' : 'ready',
+      isDefault: !shouldClone && parseBool(req.body.isDefault),
     },
   });
+
+  if (shouldClone && providerName === 'aliyun') {
+    try {
+      const result = await provider.cloneVoice({ voice });
+      const updates = {
+        provider: result.provider || providerName,
+        providerVoiceId: result.providerVoiceId,
+        providerModel: result.providerModel,
+        providerStatus: result.providerStatus,
+        providerPayload: JSON.stringify(result.providerPayload || {}),
+        providerError: null,
+        status: 'ready',
+      };
+      if (parseBool(req.body.isDefault)) {
+        await prisma.voice.updateMany({ where: { userId }, data: { isDefault: false } });
+        updates.isDefault = true;
+      }
+      voice = await prisma.voice.update({
+        where: { id: voice.id },
+        data: updates,
+      });
+    } catch (error) {
+      voice = await prisma.voice.update({
+        where: { id: voice.id },
+        data: {
+          status: 'failed',
+          provider: providerName,
+          providerStatus: 'FAILED',
+          providerError: error.message,
+        },
+      });
+      return res.status(502).json({ error: `声音克隆失败：${error.message}`, voice });
+    }
+  }
+
   res.status(201).json(voice);
 }));
 
