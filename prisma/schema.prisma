@@ -29,6 +29,7 @@ model Avatar {
   style        String
   previewImage String
   sourceImage  String
+  sourceVideo  String?
   status       String          @default("active")
   isDefault    Boolean         @default(false)
   createdAt    DateTime        @default(now())

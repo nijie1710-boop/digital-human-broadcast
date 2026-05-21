@@ -37,6 +37,12 @@ const uploadRules = {
     mimes: ['image/jpeg', 'image/png', 'image/webp'],
     message: '数字人图片只允许上传 jpg/png/webp 文件',
   },
+  sourceVideo: {
+    folder: 'avatar-videos',
+    extensions: ['.mp4', '.webm', '.mov'],
+    mimes: ['video/mp4', 'video/webm', 'video/quicktime'],
+    message: '数字人基础视频只允许上传 mp4/webm/mov 文件',
+  },
   sample: {
     folder: 'voices',
     extensions: ['.wav', '.mp3', '.m4a'],
@@ -101,7 +107,7 @@ function loadDotEnv() {
 }
 
 function ensureLocalFiles() {
-  for (const dir of ['public/uploads/avatars', 'public/uploads/voices', 'public/uploads/projects', 'public/samples', 'prisma']) {
+  for (const dir of ['public/uploads/avatars', 'public/uploads/avatar-videos', 'public/uploads/voices', 'public/uploads/projects', 'public/samples', 'prisma']) {
     fs.mkdirSync(path.join(rootDir, dir), { recursive: true });
   }
   const dbPath = path.join(rootDir, 'prisma/dev.db');
@@ -179,6 +185,7 @@ async function setDefault(model, id, userId) {
 }
 
 app.get('/api/health', (req, res) => {
+  const videoMode = String(process.env.ALIYUN_VIDEO_MODE || 's2v').toLowerCase();
   const videoResolution = process.env.ALIYUN_VIDEO_RESOLUTION || '480P';
   const defaultVideoPrice = videoResolution.toUpperCase() === '720P' ? 0.9 : 0.5;
   res.json({
@@ -188,14 +195,17 @@ app.get('/api/health', (req, res) => {
       configured: Boolean(process.env.ALIYUN_DASHSCOPE_API_KEY || process.env.DASHSCOPE_API_KEY),
       publicBaseUrlConfigured: Boolean(process.env.PUBLIC_BASE_URL),
       region: process.env.ALIYUN_MODEL_REGION || 'beijing',
+      videoMode,
     },
     cost: {
       enabled: providerName === 'aliyun',
       currency: 'CNY',
-      videoModel: process.env.ALIYUN_VIDEO_MODEL || 'wan2.2-s2v',
+      videoModel: videoMode === 'videoretalk' ? (process.env.ALIYUN_VIDEORETALK_MODEL || 'videoretalk') : (process.env.ALIYUN_VIDEO_MODEL || 'wan2.2-s2v'),
       videoResolution,
-      videoUnitPricePerSecond: Number(process.env.ALIYUN_VIDEO_PRICE_CNY_PER_SECOND || defaultVideoPrice),
-      detectUnitPricePerImage: Number(process.env.ALIYUN_DETECT_PRICE_CNY_PER_IMAGE || 0.004),
+      videoUnitPricePerSecond: Number(videoMode === 'videoretalk'
+        ? (process.env.ALIYUN_VIDEORETALK_PRICE_CNY_PER_SECOND || 0.08)
+        : (process.env.ALIYUN_VIDEO_PRICE_CNY_PER_SECOND || defaultVideoPrice)),
+      detectUnitPricePerImage: Number(videoMode === 'videoretalk' ? 0 : (process.env.ALIYUN_DETECT_PRICE_CNY_PER_IMAGE || 0.004)),
       ttsModel: process.env.ALIYUN_TTS_MODEL || 'qwen3-tts-flash',
       ttsUnitPricePer10kCharacters: Number(process.env.ALIYUN_TTS_PRICE_CNY_PER_10K_CHARS || 0.8),
       note: '仅为生成前预估，实际费用以阿里云账单和最终视频时长为准，未扣除免费额度。',
@@ -212,10 +222,11 @@ app.get('/api/avatars', asyncHandler(async (req, res) => {
   res.json(avatars);
 }));
 
-app.post('/api/avatars', upload.single('image'), asyncHandler(async (req, res) => {
+app.post('/api/avatars', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'sourceVideo', maxCount: 1 }]), asyncHandler(async (req, res) => {
   const userId = await currentUserId(req);
   requireFields(req.body, ['name', 'gender', 'style']);
-  const imageUrl = fileUrl(req.file) || req.body.previewImage || req.body.sourceImage;
+  const imageUrl = fileUrl(req.files?.image?.[0]) || req.body.previewImage || req.body.sourceImage;
+  const sourceVideo = fileUrl(req.files?.sourceVideo?.[0]) || req.body.sourceVideo || '';
   if (!imageUrl) return res.status(400).json({ error: '请上传数字人形象图' });
   if (parseBool(req.body.isDefault)) await prisma.avatar.updateMany({ where: { userId }, data: { isDefault: false } });
 
@@ -227,6 +238,7 @@ app.post('/api/avatars', upload.single('image'), asyncHandler(async (req, res) =
       style: req.body.style.trim(),
       previewImage: imageUrl,
       sourceImage: imageUrl,
+      sourceVideo,
       status: req.body.status || 'active',
       isDefault: parseBool(req.body.isDefault),
     },
@@ -234,13 +246,14 @@ app.post('/api/avatars', upload.single('image'), asyncHandler(async (req, res) =
   res.status(201).json(avatar);
 }));
 
-app.put('/api/avatars/:id', upload.single('image'), asyncHandler(async (req, res) => {
+app.put('/api/avatars/:id', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'sourceVideo', maxCount: 1 }]), asyncHandler(async (req, res) => {
   const userId = await currentUserId(req);
   const existing = await prisma.avatar.findFirst({ where: { id: req.params.id, userId } });
   if (!existing) return res.status(404).json({ error: '数字人不存在' });
   if (parseBool(req.body.isDefault)) await prisma.avatar.updateMany({ where: { userId }, data: { isDefault: false } });
 
-  const imageUrl = fileUrl(req.file);
+  const imageUrl = fileUrl(req.files?.image?.[0]);
+  const sourceVideo = fileUrl(req.files?.sourceVideo?.[0]);
   const avatar = await prisma.avatar.update({
     where: { id: req.params.id },
     data: {
@@ -249,6 +262,7 @@ app.put('/api/avatars/:id', upload.single('image'), asyncHandler(async (req, res
       style: req.body.style?.trim() || existing.style,
       previewImage: imageUrl || existing.previewImage,
       sourceImage: imageUrl || existing.sourceImage,
+      sourceVideo: sourceVideo || existing.sourceVideo,
       status: req.body.status || existing.status,
       isDefault: parseBool(req.body.isDefault) || (existing.isDefault && req.body.isDefault === undefined),
     },
@@ -422,6 +436,9 @@ app.post('/api/jobs', asyncHandler(async (req, res) => {
   if (!avatar) return res.status(400).json({ error: '请选择有效数字人' });
   if (!voice) return res.status(400).json({ error: '请选择有效声音' });
   if (voice.status !== 'ready') return res.status(400).json({ error: '当前声音还在克隆处理中，请稍后再试' });
+  if (providerName === 'aliyun' && String(process.env.ALIYUN_VIDEO_MODE || 's2v').toLowerCase() === 'videoretalk' && !avatar.sourceVideo) {
+    return res.status(400).json({ error: 'VideoRetalk 模式需要先给数字人上传基础视频' });
+  }
 
   const job = await jobRunner.enqueueJob({
     userId,

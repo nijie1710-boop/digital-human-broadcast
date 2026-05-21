@@ -110,8 +110,12 @@ export class AliyunProvider extends DigitalHumanProvider {
 
   async animateAvatar({ job, imageUrl, audioUrl }) {
     const artifact = this.artifacts.get(job.id) || {};
-    const publicImageUrl = toPublicUrl(imageUrl || artifact.imageUrl || job.avatar?.sourceImage || job.avatar?.previewImage || job.coverUrl);
     const publicAudioUrl = toPublicUrl(audioUrl || artifact.audioUrl || job.audioUrl);
+    if (videoMode() === 'videoretalk') {
+      return this.submitVideoRetalk({ job, audioUrl: publicAudioUrl });
+    }
+
+    const publicImageUrl = toPublicUrl(imageUrl || artifact.imageUrl || job.avatar?.sourceImage || job.avatar?.previewImage || job.coverUrl);
     const payload = {
       model: process.env.ALIYUN_VIDEO_MODEL || 'wan2.2-s2v',
       input: {
@@ -136,6 +140,45 @@ export class AliyunProvider extends DigitalHumanProvider {
     const nextArtifact = {
       imageUrl: publicImageUrl,
       audioUrl: publicAudioUrl,
+      providerTaskId: taskId,
+      providerStatus: response.output?.task_status || 'PENDING',
+      providerPayload: response,
+    };
+    this.mergeArtifact(job.id, nextArtifact);
+    return nextArtifact;
+  }
+
+  async submitVideoRetalk({ job, audioUrl }) {
+    const publicVideoUrl = toPublicUrl(job.avatar?.sourceVideo);
+    const payload = {
+      model: process.env.ALIYUN_VIDEORETALK_MODEL || 'videoretalk',
+      input: {
+        video_url: publicVideoUrl,
+        audio_url: audioUrl,
+      },
+      parameters: {
+        video_extension: process.env.ALIYUN_VIDEORETALK_EXTENSION === 'true',
+      },
+    };
+    try {
+      payload.input.ref_image_url = toPublicUrl(job.avatar?.sourceImage || job.avatar?.previewImage);
+    } catch {
+      // ref_image_url is optional for VideoRetalk.
+    }
+
+    const response = await this.request('/services/aigc/image2video/video-synthesis', {
+      method: 'POST',
+      json: payload,
+      asyncTask: true,
+    });
+    const taskId = response.output?.task_id || response.task_id || response.request_id;
+    if (!taskId) {
+      throw new Error(`阿里 VideoRetalk 已返回，但没有找到 taskId：${safeStringify(response).slice(0, 220)}`);
+    }
+
+    const nextArtifact = {
+      videoSourceUrl: publicVideoUrl,
+      audioUrl,
       providerTaskId: taskId,
       providerStatus: response.output?.task_status || 'PENDING',
       providerPayload: response,
@@ -320,6 +363,10 @@ function defaultCloneTargetModel(cloneModel) {
   return cloneModel === 'qwen-voice-enrollment'
     ? DEFAULT_QWEN_CLONE_TARGET_MODEL
     : DEFAULT_COSYVOICE_CLONE_TARGET_MODEL;
+}
+
+function videoMode() {
+  return String(process.env.ALIYUN_VIDEO_MODE || 's2v').toLowerCase();
 }
 
 function isDetectionPassed(response) {

@@ -18,6 +18,14 @@ const ALIYUN_STAGES = [
   { afterSeconds: 8, progress: 80, status: 'running', step: '等待视频生成', action: 'composeVideo', repeatUntilVideo: true },
 ];
 
+const ALIYUN_VIDEORETALK_STAGES = [
+  { afterSeconds: 0, progress: 0, status: 'pending', step: '创建任务' },
+  { afterSeconds: 1, progress: 15, status: 'running', step: '准备文案' },
+  { afterSeconds: 2, progress: 30, status: 'running', step: 'TTS 语音生成中', action: 'synthesizeSpeech' },
+  { afterSeconds: 5, progress: 60, status: 'running', step: '提交 VideoRetalk 任务', action: 'animateAvatar' },
+  { afterSeconds: 8, progress: 80, status: 'running', step: '等待口型替换', action: 'composeVideo', repeatUntilVideo: true },
+];
+
 function resolveStage(job) {
   const stages = stagesForProvider(job.provider);
   const baseTime = job.startedAt || job.createdAt;
@@ -28,7 +36,10 @@ function resolveStage(job) {
 }
 
 function stagesForProvider(provider) {
-  return provider === 'aliyun' ? ALIYUN_STAGES : MOCK_STAGES;
+  if (provider !== 'aliyun') return MOCK_STAGES;
+  return String(process.env.ALIYUN_VIDEO_MODE || 's2v').toLowerCase() === 'videoretalk'
+    ? ALIYUN_VIDEORETALK_STAGES
+    : ALIYUN_STAGES;
 }
 
 function providerResultToJobData(result) {

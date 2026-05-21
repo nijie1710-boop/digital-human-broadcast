@@ -298,6 +298,11 @@ function App() {
       setToast('未配置阿里 API Key，请设置 ALIYUN_DASHSCOPE_API_KEY');
       return;
     }
+    if (systemConfig.provider === 'aliyun' && systemConfig.aliyun?.videoMode === 'videoretalk' && !selectedAvatar?.sourceVideo) {
+      setToast('VideoRetalk 模式需要先给数字人上传基础视频');
+      setActiveView('avatars');
+      return;
+    }
 
     setBusy('generate');
     try {
@@ -792,6 +797,7 @@ function SettingsPanel({
               <div className="text-xs text-slate-500">
                 {selectedAvatar.gender} | {selectedAvatar.style} | {selectedAvatar.status}
               </div>
+              {selectedAvatar.sourceVideo ? <div className="mt-0.5 text-xs font-bold text-blue-600">VideoRetalk 基础视频已就绪</div> : null}
             </div>
           </div>
         ) : null}
@@ -1048,6 +1054,7 @@ function AvatarLibrary({ avatars, refreshAll, selectedAvatarId, setSelectedAvata
                 <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-500">{avatar.status}</span>
               </div>
               <div className="mt-1 text-xs text-slate-500">{avatar.gender} | {avatar.style}</div>
+              {avatar.sourceVideo ? <div className="mt-1 text-xs font-bold text-blue-600">已上传基础视频</div> : null}
               <div className="mt-3 flex flex-wrap gap-2">
                 <IconButton icon={Eye} label="预览" onClick={() => setPreview(avatar)} />
                 <IconButton icon={Edit3} label="编辑" onClick={() => setModal({ mode: 'edit', avatar })} />
@@ -1071,6 +1078,7 @@ function AvatarModal({ modal, onClose, refreshAll, setToast, setSelectedAvatarId
   const [style, setStyle] = useState(avatar?.style || '电商口播');
   const [isDefault, setIsDefault] = useState(Boolean(avatar?.isDefault));
   const [file, setFile] = useState(null);
+  const [videoFile, setVideoFile] = useState(null);
   const [filePreview, setFilePreview] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -1100,6 +1108,7 @@ function AvatarModal({ modal, onClose, refreshAll, setToast, setSelectedAvatarId
     form.append('style', style);
     form.append('isDefault', String(isDefault));
     if (file) form.append('image', file);
+    if (videoFile) form.append('sourceVideo', videoFile);
     setBusy(true);
     try {
       const saved = await apiFetch(avatar ? `/api/avatars/${avatar.id}` : '/api/avatars', {
@@ -1132,6 +1141,15 @@ function AvatarModal({ modal, onClose, refreshAll, setToast, setSelectedAvatarId
           onInvalid={() => setToast('数字人图片只支持 jpg/png/webp')}
           previewUrl={filePreview || avatar?.previewImage}
           mediaType="image"
+        />
+        <FileDropzone
+          label="基础视频（VideoRetalk 使用）"
+          accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
+          helper={avatar?.sourceVideo ? '已上传基础视频；重新拖入可替换。建议 10-30 秒、正脸、光线清楚。' : '可选但推荐上传。VideoRetalk 必须使用基础视频，支持 mp4/webm/mov。'}
+          file={videoFile}
+          onFile={setVideoFile}
+          onInvalid={() => setToast('基础视频只支持 mp4/webm/mov')}
+          mediaType="video"
         />
         <label className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600">
           <input type="checkbox" checked={isDefault} onChange={(event) => setIsDefault(event.target.checked)} />
