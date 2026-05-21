@@ -179,6 +179,8 @@ async function setDefault(model, id, userId) {
 }
 
 app.get('/api/health', (req, res) => {
+  const videoResolution = process.env.ALIYUN_VIDEO_RESOLUTION || '480P';
+  const defaultVideoPrice = videoResolution.toUpperCase() === '720P' ? 0.9 : 0.5;
   res.json({
     ok: true,
     provider: providerName,
@@ -186,6 +188,17 @@ app.get('/api/health', (req, res) => {
       configured: Boolean(process.env.ALIYUN_DASHSCOPE_API_KEY || process.env.DASHSCOPE_API_KEY),
       publicBaseUrlConfigured: Boolean(process.env.PUBLIC_BASE_URL),
       region: process.env.ALIYUN_MODEL_REGION || 'beijing',
+    },
+    cost: {
+      enabled: providerName === 'aliyun',
+      currency: 'CNY',
+      videoModel: process.env.ALIYUN_VIDEO_MODEL || 'wan2.2-s2v',
+      videoResolution,
+      videoUnitPricePerSecond: Number(process.env.ALIYUN_VIDEO_PRICE_CNY_PER_SECOND || defaultVideoPrice),
+      detectUnitPricePerImage: Number(process.env.ALIYUN_DETECT_PRICE_CNY_PER_IMAGE || 0.004),
+      ttsModel: process.env.ALIYUN_TTS_MODEL || 'qwen3-tts-flash',
+      ttsUnitPricePer10kCharacters: Number(process.env.ALIYUN_TTS_PRICE_CNY_PER_10K_CHARS || 0.8),
+      note: '仅为生成前预估，实际费用以阿里云账单和最终视频时长为准，未扣除免费额度。',
     },
   });
 });

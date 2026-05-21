@@ -3,6 +3,7 @@ import {
   AlertCircle,
   Bell,
   Braces,
+  Calculator,
   CheckCircle2,
   ChevronDown,
   Clapperboard,
@@ -96,6 +97,51 @@ function hasActiveJobs(jobs) {
   return jobs.some((job) => ['pending', 'running'].includes(job.status));
 }
 
+function countBillingCharacters(value) {
+  return Array.from(String(value || '').trim()).reduce((total, char) => {
+    return total + (/[\u3400-\u9fff\uf900-\ufaff]/i.test(char) ? 2 : 1);
+  }, 0);
+}
+
+function estimateVideoSeconds(value) {
+  const textLength = Array.from(String(value || '').trim()).length;
+  if (!textLength) return 0;
+  return Math.max(5, Math.ceil(textLength / 4));
+}
+
+function formatMoney(value) {
+  if (!Number.isFinite(value) || value <= 0) return '¥0.00';
+  if (value < 0.01) return `¥${value.toFixed(4)}`;
+  return `¥${value.toFixed(2)}`;
+}
+
+function buildCostEstimate(script, systemConfig) {
+  const config = systemConfig.cost || {};
+  const enabled = Boolean(config.enabled);
+  const seconds = estimateVideoSeconds(script);
+  const billingCharacters = countBillingCharacters(script);
+  const videoUnitPrice = Number(config.videoUnitPricePerSecond || 0);
+  const ttsUnitPrice = Number(config.ttsUnitPricePer10kCharacters || 0);
+  const detectUnitPrice = Number(config.detectUnitPricePerImage || 0);
+  const videoCost = enabled ? seconds * videoUnitPrice : 0;
+  const ttsCost = enabled ? (billingCharacters / 10000) * ttsUnitPrice : 0;
+  const detectCost = enabled && seconds > 0 ? detectUnitPrice : 0;
+
+  return {
+    enabled,
+    provider: systemConfig.provider || 'mock',
+    seconds,
+    billingCharacters,
+    videoCost,
+    ttsCost,
+    detectCost,
+    total: videoCost + ttsCost + detectCost,
+    videoModel: config.videoModel || 'wan2.2-s2v',
+    videoResolution: config.videoResolution || '480P',
+    note: config.note || '仅为生成前预估，实际费用以模型服务商账单为准。',
+  };
+}
+
 function App() {
   const [activeView, setActiveView] = useState('workbench');
   const [avatars, setAvatars] = useState([]);
@@ -177,6 +223,7 @@ function App() {
 
   const selectedAvatar = avatars.find((item) => item.id === selectedAvatarId);
   const selectedVoice = voices.find((item) => item.id === selectedVoiceId);
+  const costEstimate = useMemo(() => buildCostEstimate(script, systemConfig), [script, systemConfig]);
 
   async function handleRewrite() {
     if (!script.trim()) {
@@ -306,6 +353,7 @@ function App() {
           busy={busy}
           handleRewrite={handleRewrite}
           handleGenerate={handleGenerate}
+          costEstimate={costEstimate}
         />
       );
     }
@@ -357,6 +405,7 @@ function App() {
     systemConfig,
     templates,
     voices,
+    costEstimate,
   ]);
 
   return (
@@ -494,6 +543,7 @@ function CreateVideoPage({
   busy,
   handleRewrite,
   handleGenerate,
+  costEstimate,
   setToast,
   setActiveView,
 }) {
@@ -581,6 +631,7 @@ function CreateVideoPage({
             busy={busy}
             setActiveView={setActiveView}
             setToast={setToast}
+            costEstimate={costEstimate}
           />
         </div>
       </section>
@@ -689,6 +740,7 @@ function SettingsPanel({
   busy,
   setActiveView,
   setToast,
+  costEstimate,
 }) {
   return (
     <div className="space-y-3">
@@ -765,6 +817,7 @@ function SettingsPanel({
         <SelectInput label="字幕样式" value={subtitleStyle} options={subtitleOptions} onChange={setSubtitleStyle} />
         <SelectInput label="背景设置" value={backgroundConfig} options={backgroundOptions} onChange={setBackgroundConfig} />
         <SelectInput label="片头片尾" value={introOutroConfig} options={introOutroOptions} onChange={setIntroOutroConfig} />
+        <CostEstimateCard estimate={costEstimate} />
         <button
           className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-sm font-black text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           type="button"
@@ -775,6 +828,43 @@ function SettingsPanel({
           生成视频
         </button>
         <p className="mt-2 text-center text-xs text-slate-400">创建任务后进入任务中心，完成后自动生成作品</p>
+      </div>
+    </div>
+  );
+}
+
+function CostEstimateCard({ estimate }) {
+  if (!estimate) return null;
+  if (!estimate.enabled) {
+    return (
+      <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-500">
+        当前为 {estimate.provider} 模式，不会产生阿里云生成费用。
+      </div>
+    );
+  }
+
+  const hasScript = estimate.seconds > 0;
+  return (
+    <div className="mt-3 rounded-2xl border border-amber-100 bg-amber-50/80 p-3">
+      <div className="flex items-start gap-2">
+        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white text-amber-600 shadow-sm">
+          <Calculator className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-black text-amber-900">生成费用预估</span>
+            <span className="text-sm font-black text-amber-900">{hasScript ? formatMoney(estimate.total) : '待输入'}</span>
+          </div>
+          {hasScript ? (
+            <div className="mt-1 text-[11px] leading-5 text-amber-800/80">
+              约 {estimate.seconds}s · {estimate.videoModel} {estimate.videoResolution} 视频 {formatMoney(estimate.videoCost)}
+              {' '}+ TTS {formatMoney(estimate.ttsCost)} + 图片检测 {formatMoney(estimate.detectCost)}
+            </div>
+          ) : (
+            <div className="mt-1 text-[11px] leading-5 text-amber-800/80">输入文案后按预计视频时长自动估算。</div>
+          )}
+          <div className="mt-1 text-[11px] leading-5 text-amber-700/80">{estimate.note}</div>
+        </div>
       </div>
     </div>
   );
