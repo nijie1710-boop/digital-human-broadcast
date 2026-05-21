@@ -26,6 +26,13 @@ const ALIYUN_VIDEORETALK_STAGES = [
   { afterSeconds: 8, progress: 80, status: 'running', step: '等待口型替换', action: 'composeVideo', repeatUntilVideo: true },
 ];
 
+const HEYGEN_STAGES = [
+  { afterSeconds: 0, progress: 0, status: 'pending', step: '创建任务' },
+  { afterSeconds: 1, progress: 20, status: 'running', step: '提交 HeyGen 视频生成', action: 'composeVideo' },
+  { afterSeconds: 10, progress: 50, status: 'running', step: '等待 HeyGen 渲染', action: 'composeVideo' },
+  { afterSeconds: 20, progress: 80, status: 'running', step: '下载生成视频', action: 'composeVideo', repeatUntilVideo: true, completedStep: '完成' },
+];
+
 function resolveStage(job) {
   const stages = stagesForProvider(job.provider);
   const baseTime = job.startedAt || job.createdAt;
@@ -36,6 +43,7 @@ function resolveStage(job) {
 }
 
 function stagesForProvider(provider) {
+  if (provider === 'heygen' || provider === 'hey-gen') return HEYGEN_STAGES;
   if (provider !== 'aliyun') return MOCK_STAGES;
   return String(process.env.ALIYUN_VIDEO_MODE || 's2v').toLowerCase() === 'videoretalk'
     ? ALIYUN_VIDEORETALK_STAGES
@@ -66,7 +74,7 @@ export class JobRunner {
     this.prisma = prisma;
     this.provider = provider;
     this.providerName = providerName;
-    this.intervalMs = intervalMs || (providerName === 'aliyun' ? 15000 : 1500);
+    this.intervalMs = intervalMs || (['aliyun', 'heygen', 'hey-gen'].includes(providerName) ? 15000 : 1500);
     this.timer = null;
     this.running = false;
   }
@@ -222,7 +230,7 @@ export class JobRunner {
       if (shouldComplete) {
         data.status = 'success';
         data.progress = 100;
-        data.stage = job.provider === 'aliyun' ? '生成完成' : next.step;
+        data.stage = next.completedStep || (job.provider === 'aliyun' ? '生成完成' : next.step);
         data.finishedAt = new Date();
         data.resultVideoUrl = providerResult?.videoUrl || activeJob.resultVideoUrl;
         data.videoUrl = providerResult?.videoUrl || providerData.videoUrl || activeJob.videoUrl;

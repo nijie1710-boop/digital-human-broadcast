@@ -1,5 +1,6 @@
 import { AliyunProvider } from './aliyun-provider.js';
 import { DIDProvider } from './did-provider.js';
+import { HeyGenProvider } from './heygen-provider.js';
 import { MockDigitalHumanProvider } from './mock-provider.js';
 
 export function createDigitalHumanProvider(name = 'mock') {
@@ -17,5 +18,9 @@ export function createDigitalHumanProvider(name = 'mock') {
     return new DIDProvider();
   }
 
-  throw new Error(`Unsupported DIGITAL_HUMAN_PROVIDER: ${name}. Use "mock" or "aliyun".`);
+  if (['heygen', 'hey-gen'].includes(providerName)) {
+    return new HeyGenProvider();
+  }
+
+  throw new Error(`Unsupported DIGITAL_HUMAN_PROVIDER: ${name}. Use "mock", "aliyun", "did", or "heygen".`);
 }

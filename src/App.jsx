@@ -171,6 +171,18 @@ function isVideoRetalkMode(systemConfig) {
   return systemConfig.provider === 'aliyun' && systemConfig.aliyun?.videoMode === 'videoretalk';
 }
 
+function isHeyGenMode(systemConfig) {
+  return systemConfig.provider === 'heygen';
+}
+
+function providerDisplayName(systemConfig) {
+  if (isHeyGenMode(systemConfig)) return 'HeyGen 高质量数字人';
+  if (isVideoRetalkMode(systemConfig)) return '阿里 VideoRetalk 口型替换';
+  if (systemConfig.provider === 'aliyun') return '阿里百炼 s2v 单图驱动';
+  if (systemConfig.provider === 'did') return 'D-ID 数字人口播';
+  return 'Mock 本地模拟';
+}
+
 function getScriptLimit(systemConfig) {
   return Number(systemConfig.scriptLimit || (systemConfig.provider === 'aliyun' ? 120 : 3000));
 }
@@ -314,6 +326,10 @@ function App() {
     }
     if (systemConfig.provider === 'aliyun' && !systemConfig.aliyun?.configured) {
       setToast('未配置阿里 API Key，请设置 ALIYUN_DASHSCOPE_API_KEY');
+      return;
+    }
+    if (systemConfig.provider === 'heygen' && !systemConfig.heygen?.configured) {
+      setToast('请先配置 HEYGEN_API_KEY。');
       return;
     }
     if (systemConfig.provider === 'aliyun' && systemConfig.aliyun?.videoMode === 'videoretalk' && !selectedAvatar?.sourceVideo) {
@@ -751,6 +767,7 @@ function ScriptPanel({ script, setScript, handleRewrite, pasteFromClipboard, bus
 
 function GenerationReadiness({ script, selectedAvatar, selectedVoice, systemConfig, scriptLimit, setActiveView, setToast }) {
   const videoRetalk = isVideoRetalkMode(systemConfig);
+  const heygen = isHeyGenMode(systemConfig);
   const scriptReady = Boolean(script.trim()) && script.length <= scriptLimit;
   const avatarReady = Boolean(selectedAvatar) && (!videoRetalk || Boolean(selectedAvatar.sourceVideo));
   const voiceReady = Boolean(selectedVoice) && selectedVoice.status === 'ready';
@@ -781,11 +798,11 @@ function GenerationReadiness({ script, selectedAvatar, selectedVoice, systemConf
         <div>
           <div className="text-sm font-black text-slate-900">生成准备</div>
           <div className="mt-0.5 text-xs text-slate-500">
-            {videoRetalk ? 'VideoRetalk 模式需要基础视频，生成后会自动进入任务中心。' : '素材准备完成后即可创建生成任务。'}
+            当前引擎：{providerDisplayName(systemConfig)}。{videoRetalk ? 'VideoRetalk 模式需要基础视频，生成后会自动进入任务中心。' : '素材准备完成后即可创建生成任务。'}
           </div>
         </div>
         <button className="self-start rounded-lg bg-white px-3 py-1.5 text-xs font-black text-blue-700 shadow-sm sm:self-auto" type="button" onClick={() => setActiveView(videoRetalk && !selectedAvatar?.sourceVideo ? 'avatars' : 'tasks')}>
-          {videoRetalk && !selectedAvatar?.sourceVideo ? '去补基础视频' : '查看任务'}
+          {videoRetalk && !selectedAvatar?.sourceVideo ? '去补基础视频' : heygen ? '查看 HeyGen 任务' : '查看任务'}
         </button>
       </div>
       <div className="grid gap-2 md:grid-cols-3">
@@ -888,7 +905,7 @@ function SettingsPanel({
           <option value="">请选择数字人</option>
           {avatars.map((avatar) => (
             <option key={avatar.id} value={avatar.id}>
-              {avatar.name} · {avatar.gender} · {avatar.style}{videoRetalk && !avatar.sourceVideo ? ' · 缺基础视频' : ''}
+              {avatar.name} · {avatar.gender} · {avatar.style}{videoRetalk && !avatar.sourceVideo ? ' · 缺基础视频' : ''}{isHeyGenMode(systemConfig) && avatar.providerAvatarId ? ' · HeyGen ID' : ''}
             </option>
           ))}
         </select>
@@ -901,6 +918,7 @@ function SettingsPanel({
                 {selectedAvatar.gender} | {selectedAvatar.style} | {selectedAvatar.status}
               </div>
               {selectedAvatar.sourceVideo ? <div className="mt-0.5 text-xs font-bold text-blue-600">VideoRetalk 基础视频已就绪</div> : null}
+              {selectedAvatar.providerAvatarId ? <div className="mt-0.5 text-xs font-bold text-violet-600">HeyGen Avatar ID 已配置</div> : null}
             </div>
           </div>
         ) : null}
@@ -949,7 +967,7 @@ function SettingsPanel({
           <Waveform seed={selectedVoice?.name?.length || 4} />
         </div>
         {selectedVoice?.sampleUrl ? <audio className="mt-3 w-full" src={selectedVoice.sampleUrl} controls /> : null}
-        {selectedVoice?.providerVoiceId ? <div className="mt-2 text-xs font-bold text-blue-600">克隆音色已启用</div> : null}
+        {selectedVoice?.providerVoiceId ? <div className="mt-2 text-xs font-bold text-blue-600">{isHeyGenMode(systemConfig) ? 'HeyGen Voice ID 已配置' : '克隆音色已启用'}</div> : null}
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -1071,7 +1089,7 @@ function FileDropzone({ label, accept, helper, file, onFile, onInvalid, previewU
   );
 }
 
-function LibraryPage({ initialTab, avatars, voices, refreshAll, selectedAvatarId, setSelectedAvatarId, selectedVoiceId, setSelectedVoiceId, setToast }) {
+function LibraryPage({ initialTab, avatars, voices, refreshAll, selectedAvatarId, setSelectedAvatarId, selectedVoiceId, setSelectedVoiceId, setToast, systemConfig }) {
   const [tab, setTab] = useState(initialTab);
   const [query, setQuery] = useState('');
 
@@ -1108,7 +1126,7 @@ function LibraryPage({ initialTab, avatars, voices, refreshAll, selectedAvatarId
       </div>
 
       {tab === 'voices' ? (
-        <VoiceLibrary voices={filteredVoices} refreshAll={refreshAll} selectedVoiceId={selectedVoiceId} setSelectedVoiceId={setSelectedVoiceId} setToast={setToast} />
+        <VoiceLibrary voices={filteredVoices} refreshAll={refreshAll} selectedVoiceId={selectedVoiceId} setSelectedVoiceId={setSelectedVoiceId} setToast={setToast} systemConfig={systemConfig} />
       ) : (
         <AvatarLibrary avatars={filteredAvatars} refreshAll={refreshAll} selectedAvatarId={selectedAvatarId} setSelectedAvatarId={setSelectedAvatarId} setToast={setToast} />
       )}
@@ -1164,6 +1182,7 @@ function AvatarLibrary({ avatars, refreshAll, selectedAvatarId, setSelectedAvata
               </div>
               <div className="mt-1 text-xs text-slate-500">{avatar.gender} | {avatar.style}</div>
               {avatar.sourceVideo ? <div className="mt-1 text-xs font-bold text-blue-600">已上传基础视频</div> : null}
+              {avatar.providerAvatarId ? <div className="mt-1 truncate text-xs font-bold text-violet-600">HeyGen Avatar ID：{avatar.providerAvatarId}</div> : null}
               <div className="mt-3 flex flex-wrap gap-2">
                 <IconButton icon={Eye} label="预览" onClick={() => setPreview(avatar)} />
                 <IconButton icon={Edit3} label="编辑" onClick={() => setModal({ mode: 'edit', avatar })} />
@@ -1185,6 +1204,7 @@ function AvatarModal({ modal, onClose, refreshAll, setToast, setSelectedAvatarId
   const [name, setName] = useState(avatar?.name || '');
   const [gender, setGender] = useState(avatar?.gender || '女性');
   const [style, setStyle] = useState(avatar?.style || '电商口播');
+  const [providerAvatarId, setProviderAvatarId] = useState(avatar?.providerAvatarId || '');
   const [isDefault, setIsDefault] = useState(Boolean(avatar?.isDefault));
   const [file, setFile] = useState(null);
   const [videoFile, setVideoFile] = useState(null);
@@ -1215,6 +1235,8 @@ function AvatarModal({ modal, onClose, refreshAll, setToast, setSelectedAvatarId
     form.append('name', name);
     form.append('gender', gender);
     form.append('style', style);
+    form.append('provider', providerAvatarId.trim() ? 'heygen' : (avatar?.provider || 'mock'));
+    form.append('providerAvatarId', providerAvatarId.trim());
     form.append('isDefault', String(isDefault));
     if (file) form.append('image', file);
     if (videoFile) form.append('sourceVideo', videoFile);
@@ -1241,6 +1263,7 @@ function AvatarModal({ modal, onClose, refreshAll, setToast, setSelectedAvatarId
         <TextField label="名称" value={name} onChange={setName} />
         <SelectInput label="性别" value={gender} options={['女性', '男性', '中性']} onChange={setGender} />
         <TextField label="风格" value={style} onChange={setStyle} placeholder="电商口播 / 企业宣传 / 课程讲解" />
+        <TextField label="HeyGen Avatar ID（可选）" value={providerAvatarId} onChange={setProviderAvatarId} placeholder="例如 avatar_xxx；留空则使用 .env 默认值" />
         <FileDropzone
           label="形象图"
           accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
@@ -1273,8 +1296,8 @@ function AvatarModal({ modal, onClose, refreshAll, setToast, setSelectedAvatarId
   );
 }
 
-function VoiceLibrary({ voices, refreshAll, selectedVoiceId, setSelectedVoiceId, setToast }) {
-  const [modalOpen, setModalOpen] = useState(false);
+function VoiceLibrary({ voices, refreshAll, selectedVoiceId, setSelectedVoiceId, setToast, systemConfig }) {
+  const [modal, setModal] = useState(null);
 
   async function deleteVoice(voice) {
     if (!window.confirm(`确认删除声音「${voice.name}」？已被任务引用的声音会被归档。`)) return;
@@ -1301,7 +1324,7 @@ function VoiceLibrary({ voices, refreshAll, selectedVoiceId, setSelectedVoiceId,
   return (
     <>
       <div className="mb-4 flex justify-end">
-        <button className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white shadow-soft" type="button" onClick={() => setModalOpen(true)}>
+        <button className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white shadow-soft" type="button" onClick={() => setModal({ mode: 'create' })}>
           <Upload className="h-4 w-4" />
           上传/克隆声音
         </button>
@@ -1337,7 +1360,7 @@ function VoiceLibrary({ voices, refreshAll, selectedVoiceId, setSelectedVoiceId,
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  <audio className="w-44" src={voice.sampleUrl} controls />
+                  {voice.sampleUrl ? <audio className="w-44" src={voice.sampleUrl} controls /> : <span className="text-xs text-slate-400">使用 Provider Voice ID</span>}
                 </td>
                 <td className="px-4 py-3 text-slate-500">{formatDate(voice.createdAt)}</td>
                 <td className="px-4 py-3">
@@ -1347,6 +1370,9 @@ function VoiceLibrary({ voices, refreshAll, selectedVoiceId, setSelectedVoiceId,
                     </button>
                     <button className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600" type="button" onClick={() => setDefault(voice)}>
                       默认
+                    </button>
+                    <button className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600" type="button" onClick={() => setModal({ mode: 'edit', voice })}>
+                      编辑
                     </button>
                     <button className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-black text-rose-600" type="button" onClick={() => deleteVoice(voice)}>
                       删除
@@ -1358,18 +1384,21 @@ function VoiceLibrary({ voices, refreshAll, selectedVoiceId, setSelectedVoiceId,
           </tbody>
         </table>
       </div>
-      {modalOpen ? <VoiceModal onClose={() => setModalOpen(false)} refreshAll={refreshAll} setToast={setToast} setSelectedVoiceId={setSelectedVoiceId} /> : null}
+      {modal ? <VoiceModal modal={modal} onClose={() => setModal(null)} refreshAll={refreshAll} setToast={setToast} setSelectedVoiceId={setSelectedVoiceId} systemConfig={systemConfig} /> : null}
     </>
   );
 }
 
-function VoiceModal({ onClose, refreshAll, setToast, setSelectedVoiceId }) {
-  const [name, setName] = useState('');
-  const [gender, setGender] = useState('女性');
-  const [language, setLanguage] = useState('普通话');
-  const [style, setStyle] = useState('活力亲切');
-  const [clone, setClone] = useState(true);
-  const [isDefault, setIsDefault] = useState(false);
+function VoiceModal({ modal, onClose, refreshAll, setToast, setSelectedVoiceId, systemConfig }) {
+  const voice = modal.voice;
+  const heygen = isHeyGenMode(systemConfig);
+  const [name, setName] = useState(voice?.name || '');
+  const [gender, setGender] = useState(voice?.gender || '女性');
+  const [language, setLanguage] = useState(voice?.language || '普通话');
+  const [style, setStyle] = useState(voice?.style || '活力亲切');
+  const [providerVoiceId, setProviderVoiceId] = useState(voice?.providerVoiceId || '');
+  const [clone, setClone] = useState(voice ? voice.status === 'pending' : !heygen);
+  const [isDefault, setIsDefault] = useState(Boolean(voice?.isDefault));
   const [file, setFile] = useState(null);
   const [audioPreview, setAudioPreview] = useState('');
   const [busy, setBusy] = useState(false);
@@ -1390,8 +1419,8 @@ function VoiceModal({ onClose, refreshAll, setToast, setSelectedVoiceId }) {
       setToast('请填写声音名称和风格');
       return;
     }
-    if (!file) {
-      setToast('请上传 wav/mp3/m4a 声音样本');
+    if (!file && !voice && !providerVoiceId.trim()) {
+      setToast('请上传 wav/mp3/m4a 声音样本，或填写 HeyGen Voice ID');
       return;
     }
     const form = new FormData();
@@ -1399,14 +1428,16 @@ function VoiceModal({ onClose, refreshAll, setToast, setSelectedVoiceId }) {
     form.append('gender', gender);
     form.append('language', language);
     form.append('style', style);
-    form.append('clone', String(clone));
+    form.append('provider', providerVoiceId.trim() ? 'heygen' : (voice?.provider || (clone ? systemConfig.provider : 'mock')));
+    form.append('providerVoiceId', providerVoiceId.trim());
+    form.append('clone', String(clone && !providerVoiceId.trim()));
     form.append('isDefault', String(isDefault));
-    form.append('sample', file);
+    if (file) form.append('sample', file);
     setBusy(true);
     try {
-      const voice = await apiFetch('/api/voices', { method: 'POST', body: form });
-      if (voice.status === 'ready') setSelectedVoiceId(voice.id);
-      setToast(clone && voice.providerVoiceId ? '声音克隆成功，已可用于生成' : clone ? '声音样本已上传，当前进入克隆队列' : '声音样本已上传');
+      const savedVoice = await apiFetch(voice ? `/api/voices/${voice.id}` : '/api/voices', { method: voice ? 'PUT' : 'POST', body: form });
+      if (savedVoice.status === 'ready') setSelectedVoiceId(savedVoice.id);
+      setToast(providerVoiceId.trim() ? 'HeyGen Voice ID 已保存' : clone ? '声音样本已上传，当前进入克隆队列' : '声音样本已上传');
       onClose();
       refreshAll({ silent: true });
     } catch (error) {
@@ -1417,16 +1448,17 @@ function VoiceModal({ onClose, refreshAll, setToast, setSelectedVoiceId }) {
   }
 
   return (
-    <Modal title="上传/克隆声音" onClose={onClose}>
+    <Modal title={voice ? '编辑声音' : '上传/克隆声音'} onClose={onClose}>
       <form className="space-y-3" onSubmit={submit}>
         <TextField label="声音名称" value={name} onChange={setName} />
         <SelectInput label="性别" value={gender} options={['女性', '男性', '中性']} onChange={setGender} />
         <TextField label="语言" value={language} onChange={setLanguage} />
         <TextField label="风格" value={style} onChange={setStyle} />
+        <TextField label="HeyGen Voice ID（可选）" value={providerVoiceId} onChange={setProviderVoiceId} placeholder="例如 voice_xxx；留空则使用 .env 默认值" />
         <FileDropzone
           label="声音样本 wav/mp3/m4a"
           accept="audio/mp3,audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/x-m4a,.mp3,.wav,.m4a"
-          helper="支持拖拽上传。建议录制 10-30 秒普通话干声，环境安静、不要混入背景音乐。"
+          helper={voice ? '可选。重新拖入可替换声音样本。' : '支持拖拽上传。若只使用 HeyGen Voice ID，可以不上传样本。'}
           file={file}
           onFile={setFile}
           onInvalid={() => setToast('声音样本只支持 wav/mp3/m4a')}
@@ -1434,10 +1466,10 @@ function VoiceModal({ onClose, refreshAll, setToast, setSelectedVoiceId }) {
           mediaType="audio"
         />
         <div className="rounded-2xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-800">
-          勾选后会调用阿里 CosyVoice 音色复刻接口，成功后保存音色 ID；后续选择这个声音生成视频时，会优先使用你的克隆音色合成音频。
+          {heygen ? 'HeyGen 模式会优先使用这里填写的 Voice ID；未填写时使用 .env 中的 HEYGEN_DEFAULT_VOICE_ID。' : '勾选后会调用阿里 CosyVoice 音色复刻接口，成功后保存音色 ID；后续选择这个声音生成视频时，会优先使用你的克隆音色合成音频。'}
         </div>
         <label className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600">
-          <input type="checkbox" checked={clone} onChange={(event) => setClone(event.target.checked)} />
+          <input type="checkbox" checked={clone} onChange={(event) => setClone(event.target.checked)} disabled={Boolean(providerVoiceId.trim()) || heygen} />
           进入声音克隆流程
         </label>
         <label className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600">
@@ -1826,11 +1858,13 @@ function ApiPage() {
 function SettingsPage({ setToast, systemConfig }) {
   const providerLabel = systemConfig.provider === 'aliyun'
     ? `aliyun · ${systemConfig.aliyun?.configured ? 'API Key 已配置' : '缺少 API Key'}`
+    : systemConfig.provider === 'heygen'
+      ? `heygen · ${systemConfig.heygen?.configured ? 'API Key 已配置' : '缺少 API Key'} · ${systemConfig.heygen?.aspectRatio || '9:16'}`
     : systemConfig.provider;
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-panel">
       <h2 className="text-xl font-black text-slate-950">设置</h2>
-      <p className="mt-1 text-sm text-slate-500">默认输出竖屏视频；mock 为离线兜底，aliyun 为百炼真实口型驱动生成。</p>
+      <p className="mt-1 text-sm text-slate-500">默认输出竖屏视频；mock 为离线兜底，aliyun / heygen / did 可接真实口播生成。</p>
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         {[
           ['默认输出比例', '9:16 竖屏视频'],

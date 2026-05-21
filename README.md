@@ -2,11 +2,12 @@
 
 React + Tailwind CSS + Express + Prisma SQLite 实现的数字人口播 MVP，包含工作台、视频生成、数字人形象与声音库、任务中心、作品管理和模板中心。
 
-当前支持三类生成链路：
+当前支持四类生成链路：
 
 - `mock`：本地离线流程，适合开发和 UI 验收，不消耗模型费用。
 - `aliyun + s2v`：阿里百炼 Qwen-TTS/CosyVoice + `wan2.2-s2v`，单图驱动。
 - `aliyun + videoretalk`：阿里百炼 TTS + VideoRetalk，使用基础视频做口型替换，通常比单图驱动更自然。
+- `heygen`：HeyGen 官方 API，直接生成高质量数字人口播视频。
 
 生成完成的视频会下载并保存到本地 `public/uploads/projects`，作品管理保存 `/uploads/projects/...mp4` 这类本地持久化地址。阿里结果视频会经过 FFmpeg 标准化为 1080x1920 MP4。
 
@@ -41,6 +42,44 @@ npm run dev
 ```
 
 mock 模式允许最多 3000 字文案，会用本地模拟流程生成竖屏视频。
+
+## HeyGen 真实模式
+
+`.env` 示例：
+
+```bash
+DATABASE_URL="file:./dev.db"
+PORT=5173
+DIGITAL_HUMAN_PROVIDER="heygen"
+HEYGEN_API_KEY="your-heygen-api-key"
+HEYGEN_API_BASE="https://api.heygen.com"
+HEYGEN_DEFAULT_AVATAR_ID="your-avatar-id"
+HEYGEN_DEFAULT_VOICE_ID="your-voice-id"
+HEYGEN_DEFAULT_RESOLUTION="1080p"
+HEYGEN_DEFAULT_ASPECT_RATIO="9:16"
+```
+
+真实 key 只放本地 `.env`，不要提交到 GitHub。
+
+获取可用 `avatar_id` 和 `voice_id`：
+
+```bash
+npm run check:heygen
+```
+
+脚本会请求 HeyGen 的 avatars / voices 列表并打印可复制的 ID，不会打印 API Key。拿到 ID 后可以填到 `.env` 的 `HEYGEN_DEFAULT_AVATAR_ID` / `HEYGEN_DEFAULT_VOICE_ID`，也可以在「数字人形象」和「声音库」里分别填写 `providerAvatarId` / `providerVoiceId`。
+
+生成链路：
+
+```text
+文案 -> HeyGen 创建视频任务 -> 等待渲染 -> 下载结果 -> 保存 /uploads/projects/*.mp4 -> 作品管理
+```
+
+测试文案：
+
+```text
+大家好，我是你的 AI 数字人助手。今天给大家演示一下，如何用这个系统一键生成数字人口播视频。
+```
 
 ## 阿里真实模式
 
@@ -129,6 +168,8 @@ ALIYUN_VIDEO_RESOLUTION="480P"
 - 图片检测不通过：换正脸清晰、无遮挡、光线均匀的人像。
 - VideoRetalk 缺基础视频：给数字人上传 10-30 秒基础视频。
 - FFmpeg 不可用：确认本机或服务器已安装 FFmpeg，标准化输出依赖它。
+- HeyGen Key 未配置：检查 `HEYGEN_API_KEY`。
+- HeyGen 缺 ID：检查 `HEYGEN_DEFAULT_AVATAR_ID` / `HEYGEN_DEFAULT_VOICE_ID`，或在库里填写 `providerAvatarId` / `providerVoiceId`。
 
 ## 构建与预览
 

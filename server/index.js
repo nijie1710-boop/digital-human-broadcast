@@ -25,7 +25,9 @@ const prisma = new PrismaClient();
 await ensureDefaultUser();
 
 const rawProviderName = String(process.env.DIGITAL_HUMAN_PROVIDER || 'mock').toLowerCase();
-const providerName = ['dashscope', 'bailian'].includes(rawProviderName) ? 'aliyun' : rawProviderName;
+const providerName = ['dashscope', 'bailian'].includes(rawProviderName)
+  ? 'aliyun'
+  : (rawProviderName === 'hey-gen' ? 'heygen' : rawProviderName);
 const provider = createDigitalHumanProvider(providerName);
 const jobRunner = new JobRunner({ prisma, provider, providerName });
 const app = express();
@@ -193,6 +195,18 @@ function scriptLimitMessage() {
   return aliyunVideoMode() === 'videoretalk' ? VIDEORETALK_SHORT_SCRIPT_MESSAGE : ALIYUN_SHORT_SCRIPT_MESSAGE;
 }
 
+function devAllowedHosts() {
+  const hosts = ['.trycloudflare.com', 'localhost', '127.0.0.1'];
+  if (process.env.PUBLIC_BASE_URL) {
+    try {
+      hosts.push(new URL(process.env.PUBLIC_BASE_URL).hostname);
+    } catch {
+      // Invalid PUBLIC_BASE_URL is handled later by provider URL validation.
+    }
+  }
+  return [...new Set(hosts)];
+}
+
 async function setDefault(model, id, userId) {
   const delegate = prisma[model];
   const existing = await delegate.findFirst({ where: { id, userId, NOT: { status: 'deleted' } } });
@@ -215,6 +229,14 @@ app.get('/api/health', (req, res) => {
       publicBaseUrlConfigured: Boolean(process.env.PUBLIC_BASE_URL),
       region: process.env.ALIYUN_MODEL_REGION || 'beijing',
       videoMode,
+    },
+    heygen: {
+      configured: Boolean(process.env.HEYGEN_API_KEY),
+      apiBase: process.env.HEYGEN_API_BASE || 'https://api.heygen.com',
+      defaultAvatarConfigured: Boolean(process.env.HEYGEN_DEFAULT_AVATAR_ID),
+      defaultVoiceConfigured: Boolean(process.env.HEYGEN_DEFAULT_VOICE_ID),
+      resolution: process.env.HEYGEN_DEFAULT_RESOLUTION || '1080p',
+      aspectRatio: process.env.HEYGEN_DEFAULT_ASPECT_RATIO || '9:16',
     },
     cost: {
       enabled: providerName === 'aliyun',
@@ -258,6 +280,8 @@ app.post('/api/avatars', upload.fields([{ name: 'image', maxCount: 1 }, { name: 
       previewImage: imageUrl,
       sourceImage: imageUrl,
       sourceVideo,
+      provider: req.body.provider || (req.body.providerAvatarId ? 'heygen' : 'mock'),
+      providerAvatarId: req.body.providerAvatarId?.trim() || null,
       status: req.body.status || 'active',
       isDefault: parseBool(req.body.isDefault),
     },
@@ -282,6 +306,8 @@ app.put('/api/avatars/:id', upload.fields([{ name: 'image', maxCount: 1 }, { nam
       previewImage: imageUrl || existing.previewImage,
       sourceImage: imageUrl || existing.sourceImage,
       sourceVideo: sourceVideo || existing.sourceVideo,
+      provider: req.body.provider || existing.provider,
+      providerAvatarId: req.body.providerAvatarId !== undefined ? (req.body.providerAvatarId.trim() || null) : existing.providerAvatarId,
       status: req.body.status || existing.status,
       isDefault: parseBool(req.body.isDefault) || (existing.isDefault && req.body.isDefault === undefined),
     },
@@ -322,13 +348,16 @@ app.get('/api/voices', asyncHandler(async (req, res) => {
 app.post('/api/voices', upload.single('sample'), asyncHandler(async (req, res) => {
   const userId = await currentUserId(req);
   requireFields(req.body, ['name', 'gender', 'language', 'style']);
-  const sampleUrl = fileUrl(req.file) || req.body.sampleUrl;
-  if (!sampleUrl) return res.status(400).json({ error: '请上传声音样本文件' });
+  const providerVoiceId = req.body.providerVoiceId?.trim() || '';
+  const sampleUrl = fileUrl(req.file) || req.body.sampleUrl || '';
+  if (!sampleUrl && !providerVoiceId) return res.status(400).json({ error: '请上传声音样本文件或填写 providerVoiceId' });
   const shouldClone = parseBool(req.body.clone);
   if (shouldClone && req.file?.size > 10 * 1024 * 1024) {
     return res.status(400).json({ error: '声音克隆样本建议不超过 10MB，请上传 10-30 秒干净人声' });
   }
-  if (parseBool(req.body.isDefault) && !shouldClone) await prisma.voice.updateMany({ where: { userId }, data: { isDefault: false } });
+  if (parseBool(req.body.isDefault) && (providerVoiceId || !shouldClone)) {
+    await prisma.voice.updateMany({ where: { userId }, data: { isDefault: false } });
+  }
 
   let voice = await prisma.voice.create({
     data: {
@@ -339,13 +368,14 @@ app.post('/api/voices', upload.single('sample'), asyncHandler(async (req, res) =
       style: req.body.style.trim(),
       sampleUrl,
       duration: req.body.duration || '00:15',
-      provider: shouldClone ? providerName : 'mock',
-      status: shouldClone ? 'pending' : 'ready',
-      isDefault: !shouldClone && parseBool(req.body.isDefault),
+      provider: req.body.provider || (providerVoiceId ? providerName : (shouldClone ? providerName : 'mock')),
+      providerVoiceId: providerVoiceId || null,
+      status: providerVoiceId ? 'ready' : (shouldClone ? 'pending' : 'ready'),
+      isDefault: (providerVoiceId || !shouldClone) && parseBool(req.body.isDefault),
     },
   });
 
-  if (shouldClone && providerName === 'aliyun') {
+  if (shouldClone && !providerVoiceId && providerName === 'aliyun') {
     try {
       const result = await provider.cloneVoice({ voice });
       const updates = {
@@ -380,6 +410,32 @@ app.post('/api/voices', upload.single('sample'), asyncHandler(async (req, res) =
   }
 
   res.status(201).json(voice);
+}));
+
+app.put('/api/voices/:id', upload.single('sample'), asyncHandler(async (req, res) => {
+  const userId = await currentUserId(req);
+  const existing = await prisma.voice.findFirst({ where: { id: req.params.id, userId } });
+  if (!existing) return res.status(404).json({ error: '声音不存在' });
+  const providerVoiceId = req.body.providerVoiceId !== undefined ? (req.body.providerVoiceId.trim() || null) : existing.providerVoiceId;
+  const sampleUrl = fileUrl(req.file) || req.body.sampleUrl || existing.sampleUrl;
+  if (parseBool(req.body.isDefault)) await prisma.voice.updateMany({ where: { userId }, data: { isDefault: false } });
+
+  const voice = await prisma.voice.update({
+    where: { id: req.params.id },
+    data: {
+      name: req.body.name?.trim() || existing.name,
+      gender: req.body.gender || existing.gender,
+      language: req.body.language?.trim() || existing.language,
+      style: req.body.style?.trim() || existing.style,
+      sampleUrl,
+      duration: req.body.duration || existing.duration,
+      provider: req.body.provider || existing.provider,
+      providerVoiceId,
+      status: req.body.status || (providerVoiceId ? 'ready' : existing.status),
+      isDefault: parseBool(req.body.isDefault) || (existing.isDefault && req.body.isDefault === undefined),
+    },
+  });
+  res.json(voice);
 }));
 
 app.delete('/api/voices/:id', asyncHandler(async (req, res) => {
@@ -451,6 +507,9 @@ app.post('/api/jobs', asyncHandler(async (req, res) => {
   if (providerName === 'aliyun' && !(process.env.ALIYUN_DASHSCOPE_API_KEY || process.env.DASHSCOPE_API_KEY)) {
     return res.status(400).json({ error: '未配置阿里 API Key，请设置 ALIYUN_DASHSCOPE_API_KEY' });
   }
+  if (providerName === 'heygen' && !process.env.HEYGEN_API_KEY) {
+    return res.status(400).json({ error: '请先配置 HEYGEN_API_KEY。' });
+  }
 
   const [avatar, voice] = await Promise.all([
     prisma.avatar.findFirst({ where: { id: req.body.avatarId, userId, NOT: { status: 'deleted' } } }),
@@ -461,6 +520,12 @@ app.post('/api/jobs', asyncHandler(async (req, res) => {
   if (voice.status !== 'ready') return res.status(400).json({ error: '当前声音还在克隆处理中，请稍后再试' });
   if (providerName === 'aliyun' && aliyunVideoMode() === 'videoretalk' && !avatar.sourceVideo) {
     return res.status(400).json({ error: 'VideoRetalk 模式需要先给数字人上传基础视频' });
+  }
+  if (providerName === 'heygen' && !avatar.providerAvatarId && !process.env.HEYGEN_DEFAULT_AVATAR_ID) {
+    return res.status(400).json({ error: 'HeyGen 生成需要给数字人填写 providerAvatarId，或配置 HEYGEN_DEFAULT_AVATAR_ID' });
+  }
+  if (providerName === 'heygen' && !voice.providerVoiceId && !process.env.HEYGEN_DEFAULT_VOICE_ID) {
+    return res.status(400).json({ error: 'HeyGen 生成需要给声音填写 providerVoiceId，或配置 HEYGEN_DEFAULT_VOICE_ID' });
   }
 
   const job = await jobRunner.enqueueJob({
@@ -574,7 +639,7 @@ if (isProduction) {
   const { createServer: createViteServer } = await import('vite');
   const vite = await createViteServer({
     root: rootDir,
-    server: { middlewareMode: true, host: '0.0.0.0' },
+    server: { middlewareMode: true, host: '0.0.0.0', allowedHosts: devAllowedHosts() },
     appType: 'spa',
   });
   app.use(vite.middlewares);
