@@ -1,12 +1,16 @@
+import { execFile as execFileCallback } from 'node:child_process';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { DigitalHumanProvider, estimateDuration } from './provider.js';
 import { toPublicUrl } from './public-url.js';
 
+const execFile = promisify(execFileCallback);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '../..');
+const cacheDir = path.join(rootDir, 'public/uploads/cache');
 const projectDir = path.join(rootDir, 'public/uploads/projects');
 
 const REGION_ENDPOINTS = {
@@ -397,7 +401,9 @@ function findVideoUrl(response) {
 }
 
 async function persistRemoteVideo(url, jobId) {
+  const rawPath = path.join(cacheDir, `${jobId}-aliyun-raw.mp4`);
   const outputPath = path.join(projectDir, `${jobId}.mp4`);
+  await fsp.mkdir(cacheDir, { recursive: true });
   await fsp.mkdir(projectDir, { recursive: true });
   const response = await fetch(url);
   if (!response.ok) {
@@ -408,8 +414,28 @@ async function persistRemoteVideo(url, jobId) {
     throw new Error(`下载阿里视频结果失败：返回类型不是视频（${contentType}）`);
   }
   const buffer = Buffer.from(await response.arrayBuffer());
-  await fsp.writeFile(outputPath, buffer);
+  await fsp.writeFile(rawPath, buffer);
+  await normalizeVideoToVertical(rawPath, outputPath);
   return `/uploads/projects/${jobId}.mp4`;
+}
+
+async function normalizeVideoToVertical(inputPath, outputPath) {
+  await execFile('ffmpeg', [
+    '-y',
+    '-i', inputPath,
+    '-map', '0:v:0',
+    '-map', '0:a?',
+    '-vf', 'scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p',
+    '-c:v', 'libx264',
+    '-preset', 'veryfast',
+    '-profile:v', 'high',
+    '-level', '4.2',
+    '-c:a', 'aac',
+    '-b:a', '128k',
+    '-ar', '44100',
+    '-movflags', '+faststart',
+    outputPath,
+  ], { timeout: 600000 });
 }
 
 function findProviderVoiceId(response) {

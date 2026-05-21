@@ -12,6 +12,9 @@ const rootDir = path.resolve(__dirname, '..');
 const port = Number(process.env.PORT || 5173);
 const isProduction = process.env.NODE_ENV === 'production';
 const DEFAULT_USER_ID = 'default-user';
+const ALIYUN_SCRIPT_LIMIT = 120;
+const MOCK_SCRIPT_LIMIT = 3000;
+const ALIYUN_SHORT_SCRIPT_MESSAGE = '阿里真实数字人模式下，首版建议每段文案不超过 120 字。长文案请后续使用分段生成。';
 
 loadDotEnv();
 ensureLocalFiles();
@@ -107,7 +110,7 @@ function loadDotEnv() {
 }
 
 function ensureLocalFiles() {
-  for (const dir of ['public/uploads/avatars', 'public/uploads/avatar-videos', 'public/uploads/voices', 'public/uploads/projects', 'public/samples', 'prisma']) {
+  for (const dir of ['public/uploads/avatars', 'public/uploads/avatar-videos', 'public/uploads/voices', 'public/uploads/projects', 'public/uploads/cache', 'public/samples', 'prisma']) {
     fs.mkdirSync(path.join(rootDir, dir), { recursive: true });
   }
   const dbPath = path.join(rootDir, 'prisma/dev.db');
@@ -176,6 +179,10 @@ function makeTitle(script) {
   return `${text || '新建'}口播视频`;
 }
 
+function scriptLimit() {
+  return providerName === 'aliyun' ? ALIYUN_SCRIPT_LIMIT : MOCK_SCRIPT_LIMIT;
+}
+
 async function setDefault(model, id, userId) {
   const delegate = prisma[model];
   const existing = await delegate.findFirst({ where: { id, userId, NOT: { status: 'deleted' } } });
@@ -191,6 +198,8 @@ app.get('/api/health', (req, res) => {
   res.json({
     ok: true,
     provider: providerName,
+    scriptLimit: scriptLimit(),
+    scriptLimitMessage: providerName === 'aliyun' ? ALIYUN_SHORT_SCRIPT_MESSAGE : '文案不能超过 3000 字',
     aliyun: {
       configured: Boolean(process.env.ALIYUN_DASHSCOPE_API_KEY || process.env.DASHSCOPE_API_KEY),
       publicBaseUrlConfigured: Boolean(process.env.PUBLIC_BASE_URL),
@@ -424,7 +433,11 @@ app.post('/api/jobs', asyncHandler(async (req, res) => {
   const userId = await currentUserId(req);
   requireFields(req.body, ['script', 'avatarId', 'voiceId']);
   const script = req.body.script.trim();
-  if (script.length > 3000) return res.status(400).json({ error: '文案不能超过 3000 字' });
+  if (script.length > scriptLimit()) {
+    return res.status(400).json({
+      error: providerName === 'aliyun' ? ALIYUN_SHORT_SCRIPT_MESSAGE : '文案不能超过 3000 字',
+    });
+  }
   if (providerName === 'aliyun' && !(process.env.ALIYUN_DASHSCOPE_API_KEY || process.env.DASHSCOPE_API_KEY)) {
     return res.status(400).json({ error: '未配置阿里 API Key，请设置 ALIYUN_DASHSCOPE_API_KEY' });
   }
@@ -539,7 +552,7 @@ app.post('/api/ai/rewrite', asyncHandler(async (req, res) => {
   const script = String(req.body.script || '').trim();
   if (!script) return res.status(400).json({ error: '请输入需要改写的文案' });
   const rewritten = `大家好，欢迎来到直播间。今天给大家重点介绍：${script.slice(0, 180)}。我们会从核心卖点、适用场景和限时权益三个方面快速讲清楚，帮助你在短时间内做出选择。现在了解并下单，还可享受专属福利。`;
-  res.json({ script: rewritten.slice(0, 3000) });
+  res.json({ script: rewritten.slice(0, scriptLimit()) });
 }));
 
 if (isProduction) {

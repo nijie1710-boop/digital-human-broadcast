@@ -171,6 +171,16 @@ function isVideoRetalkMode(systemConfig) {
   return systemConfig.provider === 'aliyun' && systemConfig.aliyun?.videoMode === 'videoretalk';
 }
 
+function getScriptLimit(systemConfig) {
+  return Number(systemConfig.scriptLimit || (systemConfig.provider === 'aliyun' ? 120 : 3000));
+}
+
+function getScriptLimitMessage(systemConfig) {
+  return systemConfig.scriptLimitMessage || (systemConfig.provider === 'aliyun'
+    ? '阿里真实数字人模式下，首版建议每段文案不超过 120 字。长文案请后续使用分段生成。'
+    : '文案不能超过 3000 字');
+}
+
 function App() {
   const [activeView, setActiveView] = useState('workbench');
   const [avatars, setAvatars] = useState([]);
@@ -253,6 +263,8 @@ function App() {
   const selectedAvatar = avatars.find((item) => item.id === selectedAvatarId);
   const selectedVoice = voices.find((item) => item.id === selectedVoiceId);
   const costEstimate = useMemo(() => buildCostEstimate(script, systemConfig), [script, systemConfig]);
+  const currentScriptLimit = getScriptLimit(systemConfig);
+  const currentScriptLimitMessage = getScriptLimitMessage(systemConfig);
 
   async function handleRewrite() {
     if (!script.trim()) {
@@ -282,8 +294,8 @@ function App() {
       setToast('请输入视频文案');
       return;
     }
-    if (text.length > 3000) {
-      setToast('文案不能超过 3000 字');
+    if (text.length > currentScriptLimit) {
+      setToast(currentScriptLimitMessage);
       return;
     }
     if (!selectedAvatarId) {
@@ -389,6 +401,8 @@ function App() {
           handleRewrite={handleRewrite}
           handleGenerate={handleGenerate}
           costEstimate={costEstimate}
+          scriptLimit={currentScriptLimit}
+          scriptLimitMessage={currentScriptLimitMessage}
         />
       );
     }
@@ -441,6 +455,8 @@ function App() {
     templates,
     voices,
     costEstimate,
+    currentScriptLimit,
+    currentScriptLimitMessage,
   ]);
 
   return (
@@ -579,6 +595,8 @@ function CreateVideoPage({
   handleRewrite,
   handleGenerate,
   costEstimate,
+  scriptLimit,
+  scriptLimitMessage,
   systemConfig,
   setToast,
   setActiveView,
@@ -593,7 +611,7 @@ function CreateVideoPage({
     if (!file) return;
     const text = await file.text();
     setScript(text.slice(0, 3000));
-    setToast(`已导入「${file.name}」`);
+    setToast(text.length > scriptLimit ? scriptLimitMessage : `已导入「${file.name}」`);
     event.target.value = '';
   }
 
@@ -605,7 +623,7 @@ function CreateVideoPage({
         return;
       }
       setScript(text.slice(0, 3000));
-      setToast('已从剪贴板导入文案');
+      setToast(text.length > scriptLimit ? scriptLimitMessage : '已从剪贴板导入文案');
     } catch {
       setToast('浏览器未授权读取剪贴板');
     }
@@ -650,12 +668,13 @@ function CreateVideoPage({
           selectedAvatar={selectedAvatar}
           selectedVoice={selectedVoice}
           systemConfig={systemConfig}
+          scriptLimit={scriptLimit}
           setActiveView={setActiveView}
           setToast={setToast}
         />
 
         <div className="grid gap-4 xl:grid-cols-[minmax(320px,1.08fr)_360px_340px]">
-          <ScriptPanel script={script} setScript={setScript} handleRewrite={handleRewrite} pasteFromClipboard={pasteFromClipboard} busy={busy} />
+          <ScriptPanel script={script} setScript={setScript} handleRewrite={handleRewrite} pasteFromClipboard={pasteFromClipboard} busy={busy} scriptLimit={scriptLimit} />
           <PreviewPanel selectedAvatar={selectedAvatar} selectedVoice={selectedVoice} script={script} subtitleStyle={subtitleStyle} backgroundConfig={backgroundConfig} />
           <SettingsPanel
             avatars={avatars}
@@ -692,8 +711,8 @@ function CreateVideoPage({
   );
 }
 
-function ScriptPanel({ script, setScript, handleRewrite, pasteFromClipboard, busy }) {
-  const overLimit = script.length > 3000;
+function ScriptPanel({ script, setScript, handleRewrite, pasteFromClipboard, busy, scriptLimit }) {
+  const overLimit = script.length > scriptLimit;
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
       <div className="mb-3 flex items-center justify-between">
@@ -714,11 +733,11 @@ function ScriptPanel({ script, setScript, handleRewrite, pasteFromClipboard, bus
         value={script}
         maxLength={3000}
         onChange={(event) => setScript(event.target.value)}
-        placeholder="请输入 500 字以内的短口播文案，最多支持 3000 字。"
+        placeholder={scriptLimit <= 120 ? '请输入 120 字以内的短口播文案。' : '请输入 500 字以内的短口播文案，最多支持 3000 字。'}
       />
       <div className="mt-3 flex items-center justify-between text-xs">
-        <span className={overLimit ? 'font-bold text-rose-600' : script.length > 500 ? 'text-amber-600' : 'text-slate-400'}>
-          字数统计：{script.length}/3000 {script.length > 500 ? '，长文案会生成更长视频' : ''}
+        <span className={overLimit ? 'font-bold text-rose-600' : script.length > Math.min(500, scriptLimit) ? 'text-amber-600' : 'text-slate-400'}>
+          字数统计：{script.length}/{scriptLimit} {script.length > scriptLimit ? '，当前文案过长' : script.length > 500 ? '，长文案会生成更长视频' : ''}
         </span>
         <button className="font-bold text-blue-600" type="button" onClick={() => setScript('')}>
           清空
@@ -728,16 +747,16 @@ function ScriptPanel({ script, setScript, handleRewrite, pasteFromClipboard, bus
   );
 }
 
-function GenerationReadiness({ script, selectedAvatar, selectedVoice, systemConfig, setActiveView, setToast }) {
+function GenerationReadiness({ script, selectedAvatar, selectedVoice, systemConfig, scriptLimit, setActiveView, setToast }) {
   const videoRetalk = isVideoRetalkMode(systemConfig);
-  const scriptReady = Boolean(script.trim()) && script.length <= 3000;
+  const scriptReady = Boolean(script.trim()) && script.length <= scriptLimit;
   const avatarReady = Boolean(selectedAvatar) && (!videoRetalk || Boolean(selectedAvatar.sourceVideo));
   const voiceReady = Boolean(selectedVoice) && selectedVoice.status === 'ready';
   const steps = [
     {
       label: '文案',
       ok: scriptReady,
-      value: scriptReady ? `${script.trim().length} 字` : '待输入',
+      value: script.trim() ? `${script.trim().length}/${scriptLimit} 字` : '待输入',
       action: () => setToast('请在左侧输入口播文案'),
     },
     {

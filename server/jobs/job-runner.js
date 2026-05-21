@@ -62,11 +62,11 @@ function stringifyPayload(value) {
 }
 
 export class JobRunner {
-  constructor({ prisma, provider, providerName = 'mock', intervalMs = 1500 }) {
+  constructor({ prisma, provider, providerName = 'mock', intervalMs }) {
     this.prisma = prisma;
     this.provider = provider;
     this.providerName = providerName;
-    this.intervalMs = intervalMs;
+    this.intervalMs = intervalMs || (providerName === 'aliyun' ? 15000 : 1500);
     this.timer = null;
     this.running = false;
   }
