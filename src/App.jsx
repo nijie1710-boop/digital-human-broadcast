@@ -167,6 +167,10 @@ function buildCostEstimate(script, systemConfig) {
   };
 }
 
+function isVideoRetalkMode(systemConfig) {
+  return systemConfig.provider === 'aliyun' && systemConfig.aliyun?.videoMode === 'videoretalk';
+}
+
 function App() {
   const [activeView, setActiveView] = useState('workbench');
   const [avatars, setAvatars] = useState([]);
@@ -359,6 +363,7 @@ function App() {
       refreshAll,
       setToast,
       setActiveView,
+      systemConfig,
     };
 
     if (activeView === 'workbench' || activeView === 'create') {
@@ -574,6 +579,7 @@ function CreateVideoPage({
   handleRewrite,
   handleGenerate,
   costEstimate,
+  systemConfig,
   setToast,
   setActiveView,
 }) {
@@ -639,6 +645,15 @@ function CreateVideoPage({
           </div>
         </div>
 
+        <GenerationReadiness
+          script={script}
+          selectedAvatar={selectedAvatar}
+          selectedVoice={selectedVoice}
+          systemConfig={systemConfig}
+          setActiveView={setActiveView}
+          setToast={setToast}
+        />
+
         <div className="grid gap-4 xl:grid-cols-[minmax(320px,1.08fr)_360px_340px]">
           <ScriptPanel script={script} setScript={setScript} handleRewrite={handleRewrite} pasteFromClipboard={pasteFromClipboard} busy={busy} />
           <PreviewPanel selectedAvatar={selectedAvatar} selectedVoice={selectedVoice} script={script} subtitleStyle={subtitleStyle} backgroundConfig={backgroundConfig} />
@@ -662,6 +677,7 @@ function CreateVideoPage({
             setActiveView={setActiveView}
             setToast={setToast}
             costEstimate={costEstimate}
+            systemConfig={systemConfig}
           />
         </div>
       </section>
@@ -707,6 +723,70 @@ function ScriptPanel({ script, setScript, handleRewrite, pasteFromClipboard, bus
         <button className="font-bold text-blue-600" type="button" onClick={() => setScript('')}>
           清空
         </button>
+      </div>
+    </div>
+  );
+}
+
+function GenerationReadiness({ script, selectedAvatar, selectedVoice, systemConfig, setActiveView, setToast }) {
+  const videoRetalk = isVideoRetalkMode(systemConfig);
+  const scriptReady = Boolean(script.trim()) && script.length <= 3000;
+  const avatarReady = Boolean(selectedAvatar) && (!videoRetalk || Boolean(selectedAvatar.sourceVideo));
+  const voiceReady = Boolean(selectedVoice) && selectedVoice.status === 'ready';
+  const steps = [
+    {
+      label: '文案',
+      ok: scriptReady,
+      value: scriptReady ? `${script.trim().length} 字` : '待输入',
+      action: () => setToast('请在左侧输入口播文案'),
+    },
+    {
+      label: videoRetalk ? '数字人基础视频' : '数字人',
+      ok: avatarReady,
+      value: selectedAvatar ? (videoRetalk && !selectedAvatar.sourceVideo ? `${selectedAvatar.name} 缺基础视频` : selectedAvatar.name) : '待选择',
+      action: () => setActiveView('avatars'),
+    },
+    {
+      label: '声音',
+      ok: voiceReady,
+      value: selectedVoice ? (selectedVoice.status === 'ready' ? selectedVoice.name : '克隆中') : '待选择',
+      action: () => setActiveView('voices'),
+    },
+  ];
+
+  return (
+    <div className="mb-4 rounded-2xl border border-blue-100 bg-blue-50/70 p-3">
+      <div className="mb-3 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+        <div>
+          <div className="text-sm font-black text-slate-900">生成准备</div>
+          <div className="mt-0.5 text-xs text-slate-500">
+            {videoRetalk ? 'VideoRetalk 模式需要基础视频，生成后会自动进入任务中心。' : '素材准备完成后即可创建生成任务。'}
+          </div>
+        </div>
+        <button className="self-start rounded-lg bg-white px-3 py-1.5 text-xs font-black text-blue-700 shadow-sm sm:self-auto" type="button" onClick={() => setActiveView(videoRetalk && !selectedAvatar?.sourceVideo ? 'avatars' : 'tasks')}>
+          {videoRetalk && !selectedAvatar?.sourceVideo ? '去补基础视频' : '查看任务'}
+        </button>
+      </div>
+      <div className="grid gap-2 md:grid-cols-3">
+        {steps.map((step) => {
+          const Icon = step.ok ? CheckCircle2 : AlertCircle;
+          return (
+            <button
+              key={step.label}
+              className={`flex items-center gap-3 rounded-xl border px-3 py-2 text-left transition ${
+                step.ok ? 'border-emerald-100 bg-white text-emerald-700' : 'border-amber-100 bg-white text-amber-700 hover:border-amber-200'
+              }`}
+              type="button"
+              onClick={step.ok ? undefined : step.action}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              <span className="min-w-0">
+                <span className="block text-xs font-black">{step.label}</span>
+                <span className="block truncate text-xs text-slate-500">{step.value}</span>
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -771,7 +851,9 @@ function SettingsPanel({
   setActiveView,
   setToast,
   costEstimate,
+  systemConfig,
 }) {
+  const videoRetalk = isVideoRetalkMode(systemConfig);
   return (
     <div className="space-y-3">
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -785,7 +867,7 @@ function SettingsPanel({
           <option value="">请选择数字人</option>
           {avatars.map((avatar) => (
             <option key={avatar.id} value={avatar.id}>
-              {avatar.name} · {avatar.gender} · {avatar.style}
+              {avatar.name} · {avatar.gender} · {avatar.style}{videoRetalk && !avatar.sourceVideo ? ' · 缺基础视频' : ''}
             </option>
           ))}
         </select>
@@ -800,6 +882,11 @@ function SettingsPanel({
               {selectedAvatar.sourceVideo ? <div className="mt-0.5 text-xs font-bold text-blue-600">VideoRetalk 基础视频已就绪</div> : null}
             </div>
           </div>
+        ) : null}
+        {videoRetalk && selectedAvatar && !selectedAvatar.sourceVideo ? (
+          <button className="mt-3 w-full rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-left text-xs font-bold text-amber-700" type="button" onClick={() => setActiveView('avatars')}>
+            当前数字人缺少基础视频，上传后才能使用 VideoRetalk 生成。
+          </button>
         ) : null}
         <div className="mt-3 grid grid-cols-3 gap-2">
           {avatars.slice(0, 3).map((avatar) => (
@@ -841,6 +928,7 @@ function SettingsPanel({
           <Waveform seed={selectedVoice?.name?.length || 4} />
         </div>
         {selectedVoice?.sampleUrl ? <audio className="mt-3 w-full" src={selectedVoice.sampleUrl} controls /> : null}
+        {selectedVoice?.providerVoiceId ? <div className="mt-2 text-xs font-bold text-blue-600">克隆音色已启用</div> : null}
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -1115,7 +1203,7 @@ function AvatarModal({ modal, onClose, refreshAll, setToast, setSelectedAvatarId
         method: avatar ? 'PUT' : 'POST',
         body: form,
       });
-      if (saved.isDefault) setSelectedAvatarId(saved.id);
+      setSelectedAvatarId(saved.id);
       setToast(avatar ? '数字人已更新' : '数字人已创建');
       onClose();
       refreshAll({ silent: true });
@@ -1297,7 +1385,7 @@ function VoiceModal({ onClose, refreshAll, setToast, setSelectedVoiceId }) {
     try {
       const voice = await apiFetch('/api/voices', { method: 'POST', body: form });
       if (voice.status === 'ready') setSelectedVoiceId(voice.id);
-      setToast(clone ? '声音样本已上传，当前进入克隆队列' : '声音样本已上传');
+      setToast(clone && voice.providerVoiceId ? '声音克隆成功，已可用于生成' : clone ? '声音样本已上传，当前进入克隆队列' : '声音样本已上传');
       onClose();
       refreshAll({ silent: true });
     } catch (error) {
@@ -1337,7 +1425,7 @@ function VoiceModal({ onClose, refreshAll, setToast, setSelectedVoiceId }) {
         </label>
         <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-sm font-black text-white disabled:opacity-60" type="submit" disabled={busy}>
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          保存声音
+          {busy && clone ? '克隆音色中' : '保存声音'}
         </button>
       </form>
     </Modal>
