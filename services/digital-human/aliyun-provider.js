@@ -1,5 +1,13 @@
+import fsp from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { DigitalHumanProvider, estimateDuration } from './provider.js';
 import { toPublicUrl } from './public-url.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const rootDir = path.resolve(__dirname, '../..');
+const projectDir = path.join(rootDir, 'public/uploads/projects');
 
 const REGION_ENDPOINTS = {
   beijing: 'https://dashscope.aliyuncs.com/api/v1',
@@ -158,16 +166,17 @@ export class AliyunProvider extends DigitalHumanProvider {
       return pendingArtifact;
     }
 
-    const videoUrl = findVideoUrl(result);
-    if (!videoUrl) {
+    const remoteVideoUrl = findVideoUrl(result);
+    if (!remoteVideoUrl) {
       throw new Error(`阿里视频任务已完成，但没有找到 videoUrl：${safeStringify(result).slice(0, 220)}`);
     }
+    const localVideoUrl = await persistRemoteVideo(remoteVideoUrl, job.id);
 
     const nextArtifact = {
       providerTaskId: taskId,
       providerStatus: result.output?.task_status || result.task_status || 'SUCCEEDED',
       providerPayload: result,
-      videoUrl,
+      videoUrl: localVideoUrl,
       duration: estimateDuration(job.script),
     };
     this.mergeArtifact(job.id, nextArtifact);
@@ -338,6 +347,22 @@ function findVideoUrl(response) {
   return findFirstUrl(response, ['video', 'url'])
     || findFirstUrl(response, ['video_url'])
     || findUrlByExtension(response, ['.mp4', '.webm']);
+}
+
+async function persistRemoteVideo(url, jobId) {
+  const outputPath = path.join(projectDir, `${jobId}.mp4`);
+  await fsp.mkdir(projectDir, { recursive: true });
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`下载阿里视频结果失败：HTTP ${response.status}`);
+  }
+  const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+  if (contentType && !contentType.includes('video/') && !contentType.includes('octet-stream')) {
+    throw new Error(`下载阿里视频结果失败：返回类型不是视频（${contentType}）`);
+  }
+  const buffer = Buffer.from(await response.arrayBuffer());
+  await fsp.writeFile(outputPath, buffer);
+  return `/uploads/projects/${jobId}.mp4`;
 }
 
 function findProviderVoiceId(response) {

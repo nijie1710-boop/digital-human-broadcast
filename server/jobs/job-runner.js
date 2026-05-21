@@ -225,7 +225,7 @@ export class JobRunner {
         include: { avatar: true, voice: true, project: true, logs: true },
       });
 
-      await this.createLog(updatedJob, {
+      await this.createLogIfChanged(updatedJob, {
         step: updatedJob.stage,
         status: shouldComplete ? 'success' : 'running',
         progress: updatedJob.progress,
@@ -274,6 +274,23 @@ export class JobRunner {
         message,
       },
     });
+  }
+
+  async createLogIfChanged(job, log) {
+    const latest = await this.prisma.jobLog.findFirst({
+      where: { jobId: job.id },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (
+      latest
+      && latest.step === log.step
+      && latest.status === log.status
+      && latest.progress === log.progress
+      && latest.message === log.message
+    ) {
+      return latest;
+    }
+    return this.createLog(job, log);
   }
 
   async ensureProject(job) {
