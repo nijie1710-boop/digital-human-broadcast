@@ -176,9 +176,11 @@ function getScriptLimit(systemConfig) {
 }
 
 function getScriptLimitMessage(systemConfig) {
-  return systemConfig.scriptLimitMessage || (systemConfig.provider === 'aliyun'
+  if (systemConfig.scriptLimitMessage) return systemConfig.scriptLimitMessage;
+  if (isVideoRetalkMode(systemConfig)) return 'VideoRetalk 首版建议每段文案不超过 120 字，长文案后续使用分段生成';
+  return systemConfig.provider === 'aliyun'
     ? '阿里真实数字人模式下，首版建议每段文案不超过 120 字。长文案请后续使用分段生成。'
-    : '文案不能超过 3000 字');
+    : '文案不能超过 3000 字';
 }
 
 function App() {
@@ -1251,11 +1253,11 @@ function AvatarModal({ modal, onClose, refreshAll, setToast, setSelectedAvatarId
         />
         <FileDropzone
           label="基础视频（VideoRetalk 使用）"
-          accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
-          helper={avatar?.sourceVideo ? '已上传基础视频；重新拖入可替换。建议 10-30 秒、正脸、光线清楚。' : '可选但推荐上传。VideoRetalk 必须使用基础视频，支持 mp4/webm/mov。'}
+          accept="video/mp4,video/webm,.mp4,.webm"
+          helper={avatar?.sourceVideo ? '已上传基础视频；重新拖入可替换。建议 10-30 秒、正脸、光线清楚。' : '可选但推荐上传。VideoRetalk 必须使用基础视频，支持 mp4/webm。'}
           file={videoFile}
           onFile={setVideoFile}
-          onInvalid={() => setToast('基础视频只支持 mp4/webm/mov')}
+          onInvalid={() => setToast('基础视频只支持 mp4/webm')}
           mediaType="video"
         />
         <label className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600">

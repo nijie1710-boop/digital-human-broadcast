@@ -195,7 +195,7 @@ export class AliyunProvider extends DigitalHumanProvider {
     const artifact = this.artifacts.get(job.id) || {};
     const taskId = job.providerTaskId || artifact.providerTaskId;
     if (!taskId) {
-      throw new Error('缺少阿里 wan2.2-s2v taskId，无法获取生成结果');
+      throw new Error(`缺少阿里 ${videoMode() === 'videoretalk' ? 'VideoRetalk' : 'wan2.2-s2v'} taskId，无法获取生成结果`);
     }
 
     const result = await this.fetchVideoStatus(taskId);

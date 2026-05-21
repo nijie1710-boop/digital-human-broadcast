@@ -15,6 +15,7 @@ const DEFAULT_USER_ID = 'default-user';
 const ALIYUN_SCRIPT_LIMIT = 120;
 const MOCK_SCRIPT_LIMIT = 3000;
 const ALIYUN_SHORT_SCRIPT_MESSAGE = '阿里真实数字人模式下，首版建议每段文案不超过 120 字。长文案请后续使用分段生成。';
+const VIDEORETALK_SHORT_SCRIPT_MESSAGE = 'VideoRetalk 首版建议每段文案不超过 120 字，长文案后续使用分段生成';
 
 loadDotEnv();
 ensureLocalFiles();
@@ -42,9 +43,9 @@ const uploadRules = {
   },
   sourceVideo: {
     folder: 'avatar-videos',
-    extensions: ['.mp4', '.webm', '.mov'],
-    mimes: ['video/mp4', 'video/webm', 'video/quicktime'],
-    message: '数字人基础视频只允许上传 mp4/webm/mov 文件',
+    extensions: ['.mp4', '.webm'],
+    mimes: ['video/mp4', 'video/webm'],
+    message: '数字人基础视频只允许上传 mp4/webm 文件',
   },
   sample: {
     folder: 'voices',
@@ -183,6 +184,15 @@ function scriptLimit() {
   return providerName === 'aliyun' ? ALIYUN_SCRIPT_LIMIT : MOCK_SCRIPT_LIMIT;
 }
 
+function aliyunVideoMode() {
+  return String(process.env.ALIYUN_VIDEO_MODE || 's2v').toLowerCase();
+}
+
+function scriptLimitMessage() {
+  if (providerName !== 'aliyun') return '文案不能超过 3000 字';
+  return aliyunVideoMode() === 'videoretalk' ? VIDEORETALK_SHORT_SCRIPT_MESSAGE : ALIYUN_SHORT_SCRIPT_MESSAGE;
+}
+
 async function setDefault(model, id, userId) {
   const delegate = prisma[model];
   const existing = await delegate.findFirst({ where: { id, userId, NOT: { status: 'deleted' } } });
@@ -192,14 +202,14 @@ async function setDefault(model, id, userId) {
 }
 
 app.get('/api/health', (req, res) => {
-  const videoMode = String(process.env.ALIYUN_VIDEO_MODE || 's2v').toLowerCase();
+  const videoMode = aliyunVideoMode();
   const videoResolution = process.env.ALIYUN_VIDEO_RESOLUTION || '480P';
   const defaultVideoPrice = videoResolution.toUpperCase() === '720P' ? 0.9 : 0.5;
   res.json({
     ok: true,
     provider: providerName,
     scriptLimit: scriptLimit(),
-    scriptLimitMessage: providerName === 'aliyun' ? ALIYUN_SHORT_SCRIPT_MESSAGE : '文案不能超过 3000 字',
+    scriptLimitMessage: scriptLimitMessage(),
     aliyun: {
       configured: Boolean(process.env.ALIYUN_DASHSCOPE_API_KEY || process.env.DASHSCOPE_API_KEY),
       publicBaseUrlConfigured: Boolean(process.env.PUBLIC_BASE_URL),
@@ -435,7 +445,7 @@ app.post('/api/jobs', asyncHandler(async (req, res) => {
   const script = req.body.script.trim();
   if (script.length > scriptLimit()) {
     return res.status(400).json({
-      error: providerName === 'aliyun' ? ALIYUN_SHORT_SCRIPT_MESSAGE : '文案不能超过 3000 字',
+      error: scriptLimitMessage(),
     });
   }
   if (providerName === 'aliyun' && !(process.env.ALIYUN_DASHSCOPE_API_KEY || process.env.DASHSCOPE_API_KEY)) {
@@ -449,7 +459,7 @@ app.post('/api/jobs', asyncHandler(async (req, res) => {
   if (!avatar) return res.status(400).json({ error: '请选择有效数字人' });
   if (!voice) return res.status(400).json({ error: '请选择有效声音' });
   if (voice.status !== 'ready') return res.status(400).json({ error: '当前声音还在克隆处理中，请稍后再试' });
-  if (providerName === 'aliyun' && String(process.env.ALIYUN_VIDEO_MODE || 's2v').toLowerCase() === 'videoretalk' && !avatar.sourceVideo) {
+  if (providerName === 'aliyun' && aliyunVideoMode() === 'videoretalk' && !avatar.sourceVideo) {
     return res.status(400).json({ error: 'VideoRetalk 模式需要先给数字人上传基础视频' });
   }
 
