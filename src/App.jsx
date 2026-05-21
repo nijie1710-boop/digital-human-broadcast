@@ -115,6 +115,24 @@ function formatMoney(value) {
   return `¥${value.toFixed(2)}`;
 }
 
+function formatBytes(value) {
+  if (!Number.isFinite(value)) return '';
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function fileMatchesAccept(file, accept) {
+  if (!file) return false;
+  const fileName = file.name.toLowerCase();
+  const fileType = String(file.type || '').toLowerCase();
+  return accept.split(',').map((item) => item.trim().toLowerCase()).filter(Boolean).some((rule) => {
+    if (rule.startsWith('.')) return fileName.endsWith(rule);
+    if (rule.endsWith('/*')) return fileType.startsWith(rule.slice(0, -1));
+    return fileType === rule;
+  });
+}
+
 function buildCostEstimate(script, systemConfig) {
   const config = systemConfig.cost || {};
   const enabled = Boolean(config.enabled);
@@ -870,6 +888,67 @@ function CostEstimateCard({ estimate }) {
   );
 }
 
+function FileDropzone({ label, accept, helper, file, onFile, onInvalid, previewUrl, mediaType = 'file' }) {
+  const inputRef = useRef(null);
+  const [dragging, setDragging] = useState(false);
+
+  function chooseFile(nextFile) {
+    if (!nextFile) return;
+    if (!fileMatchesAccept(nextFile, accept)) {
+      onInvalid?.();
+      return;
+    }
+    onFile(nextFile);
+  }
+
+  function handleDrop(event) {
+    event.preventDefault();
+    setDragging(false);
+    chooseFile(event.dataTransfer.files?.[0]);
+  }
+
+  return (
+    <div>
+      <div className="mb-1 block text-xs font-bold text-slate-500">{label}</div>
+      <button
+        className={`group w-full rounded-2xl border border-dashed px-4 py-4 text-left transition ${
+          dragging ? 'border-blue-500 bg-blue-50 ring-4 ring-blue-100' : 'border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50/60'
+        }`}
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        onDragEnter={(event) => {
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragOver={(event) => event.preventDefault()}
+        onDragLeave={(event) => {
+          event.preventDefault();
+          setDragging(false);
+        }}
+        onDrop={handleDrop}
+      >
+        <input ref={inputRef} className="hidden" type="file" accept={accept} onChange={(event) => chooseFile(event.target.files?.[0])} />
+        <div className="flex items-center gap-3">
+          {mediaType === 'image' && previewUrl ? (
+            <img className="h-16 w-16 rounded-2xl object-cover" src={previewUrl} alt="上传预览" />
+          ) : (
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white text-blue-600 shadow-sm">
+              <Upload className="h-5 w-5" />
+            </span>
+          )}
+          <div className="min-w-0">
+            <div className="text-sm font-black text-slate-800">{file ? file.name : '拖拽文件到这里，或点击选择文件'}</div>
+            <div className="mt-1 text-xs leading-5 text-slate-500">
+              {file ? `${formatBytes(file.size)} · 已选择` : helper}
+            </div>
+          </div>
+        </div>
+      </button>
+      {mediaType === 'audio' && previewUrl ? <audio className="mt-2 w-full" src={previewUrl} controls /> : null}
+    </div>
+  );
+}
+
 function LibraryPage({ initialTab, avatars, voices, refreshAll, selectedAvatarId, setSelectedAvatarId, selectedVoiceId, setSelectedVoiceId, setToast }) {
   const [tab, setTab] = useState(initialTab);
   const [query, setQuery] = useState('');
@@ -985,7 +1064,18 @@ function AvatarModal({ modal, onClose, refreshAll, setToast, setSelectedAvatarId
   const [style, setStyle] = useState(avatar?.style || '电商口播');
   const [isDefault, setIsDefault] = useState(Boolean(avatar?.isDefault));
   const [file, setFile] = useState(null);
+  const [filePreview, setFilePreview] = useState('');
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!file) {
+      setFilePreview('');
+      return undefined;
+    }
+    const url = URL.createObjectURL(file);
+    setFilePreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
   async function submit(event) {
     event.preventDefault();
@@ -1026,10 +1116,16 @@ function AvatarModal({ modal, onClose, refreshAll, setToast, setSelectedAvatarId
         <TextField label="名称" value={name} onChange={setName} />
         <SelectInput label="性别" value={gender} options={['女性', '男性', '中性']} onChange={setGender} />
         <TextField label="风格" value={style} onChange={setStyle} placeholder="电商口播 / 企业宣传 / 课程讲解" />
-        <label className="block">
-          <span className="mb-1 block text-xs font-bold text-slate-500">形象图</span>
-          <input className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" type="file" accept="image/*" onChange={(event) => setFile(event.target.files?.[0] || null)} />
-        </label>
+        <FileDropzone
+          label="形象图"
+          accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+          helper="支持 jpg / png / webp，建议正脸清晰、无遮挡、光线均匀。"
+          file={file}
+          onFile={setFile}
+          onInvalid={() => setToast('数字人图片只支持 jpg/png/webp')}
+          previewUrl={filePreview || avatar?.previewImage}
+          mediaType="image"
+        />
         <label className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600">
           <input type="checkbox" checked={isDefault} onChange={(event) => setIsDefault(event.target.checked)} />
           设为默认数字人
@@ -1138,7 +1234,18 @@ function VoiceModal({ onClose, refreshAll, setToast, setSelectedVoiceId }) {
   const [clone, setClone] = useState(true);
   const [isDefault, setIsDefault] = useState(false);
   const [file, setFile] = useState(null);
+  const [audioPreview, setAudioPreview] = useState('');
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!file) {
+      setAudioPreview('');
+      return undefined;
+    }
+    const url = URL.createObjectURL(file);
+    setAudioPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
   async function submit(event) {
     event.preventDefault();
@@ -1147,7 +1254,7 @@ function VoiceModal({ onClose, refreshAll, setToast, setSelectedVoiceId }) {
       return;
     }
     if (!file) {
-      setToast('请上传 mp3 或 wav 声音样本');
+      setToast('请上传 wav/mp3/m4a 声音样本');
       return;
     }
     const form = new FormData();
@@ -1162,7 +1269,7 @@ function VoiceModal({ onClose, refreshAll, setToast, setSelectedVoiceId }) {
     try {
       const voice = await apiFetch('/api/voices', { method: 'POST', body: form });
       if (voice.status === 'ready') setSelectedVoiceId(voice.id);
-      setToast(clone ? '声音样本已上传，克隆任务处理中' : '声音样本已上传');
+      setToast(clone ? '声音样本已上传，当前进入克隆队列' : '声音样本已上传');
       onClose();
       refreshAll({ silent: true });
     } catch (error) {
@@ -1179,10 +1286,19 @@ function VoiceModal({ onClose, refreshAll, setToast, setSelectedVoiceId }) {
         <SelectInput label="性别" value={gender} options={['女性', '男性', '中性']} onChange={setGender} />
         <TextField label="语言" value={language} onChange={setLanguage} />
         <TextField label="风格" value={style} onChange={setStyle} />
-        <label className="block">
-          <span className="mb-1 block text-xs font-bold text-slate-500">声音样本 mp3/wav/m4a</span>
-          <input className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" type="file" accept="audio/mp3,audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/x-m4a,.m4a" onChange={(event) => setFile(event.target.files?.[0] || null)} />
-        </label>
+        <FileDropzone
+          label="声音样本 wav/mp3/m4a"
+          accept="audio/mp3,audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/x-m4a,.mp3,.wav,.m4a"
+          helper="支持拖拽上传。建议录制 10-30 秒普通话干声，环境安静、不要混入背景音乐。"
+          file={file}
+          onFile={setFile}
+          onInvalid={() => setToast('声音样本只支持 wav/mp3/m4a')}
+          previewUrl={audioPreview}
+          mediaType="audio"
+        />
+        <div className="rounded-2xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-800">
+          当前版本会先保存你的声音样本并创建克隆队列；真正让生成视频使用你的克隆音色，还需要接入阿里 CosyVoice 音色复刻接口并保存返回的音色 ID。
+        </div>
         <label className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600">
           <input type="checkbox" checked={clone} onChange={(event) => setClone(event.target.checked)} />
           进入声音克隆流程
