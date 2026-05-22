@@ -24,12 +24,9 @@ const { PrismaClient } = await import('@prisma/client');
 const prisma = new PrismaClient();
 await ensureDefaultUser();
 
-const rawProviderName = String(process.env.DIGITAL_HUMAN_PROVIDER || 'mock').toLowerCase();
-const providerName = ['dashscope', 'bailian'].includes(rawProviderName)
-  ? 'aliyun'
-  : (rawProviderName === 'hey-gen' ? 'heygen' : rawProviderName);
-const provider = createDigitalHumanProvider(providerName);
-const jobRunner = new JobRunner({ prisma, provider, providerName });
+let providerName = normalizeProviderName(process.env.DIGITAL_HUMAN_PROVIDER || 'mock');
+let provider = createDigitalHumanProvider(providerName);
+let jobRunner = new JobRunner({ prisma, provider, providerName });
 const app = express();
 
 app.use(express.json({ limit: '2mb' }));
@@ -182,6 +179,43 @@ function makeTitle(script) {
   return `${text || '新建'}口播视频`;
 }
 
+function normalizeProviderName(value) {
+  const name = String(value || 'mock').toLowerCase();
+  if (['dashscope', 'bailian'].includes(name)) return 'aliyun';
+  if (name === 'hey-gen') return 'heygen';
+  if (['d-id', 'd_id'].includes(name)) return 'did';
+  return name;
+}
+
+function providerOptions() {
+  return [
+    {
+      id: 'mock',
+      name: 'Mock 本地模拟',
+      configured: true,
+      description: '不调用付费接口，适合测试流程。',
+    },
+    {
+      id: 'aliyun',
+      name: aliyunVideoMode() === 'videoretalk' ? '阿里 VideoRetalk' : '阿里百炼 s2v',
+      configured: Boolean(process.env.ALIYUN_DASHSCOPE_API_KEY || process.env.DASHSCOPE_API_KEY),
+      description: '阿里 TTS + 数字人视频生成。',
+    },
+    {
+      id: 'heygen',
+      name: 'HeyGen 高质量数字人',
+      configured: Boolean(process.env.HEYGEN_API_KEY),
+      description: 'HeyGen 官方 Avatar API。',
+    },
+    {
+      id: 'did',
+      name: 'D-ID 数字人口播',
+      configured: Boolean(process.env.D_ID_API_KEY),
+      description: 'D-ID Talks API，需配置 D_ID_API_KEY。',
+    },
+  ];
+}
+
 function scriptLimit() {
   return providerName === 'aliyun' ? ALIYUN_SCRIPT_LIMIT : MOCK_SCRIPT_LIMIT;
 }
@@ -222,6 +256,31 @@ function placeholderImage(name) {
 function numberEnv(key, fallback) {
   const value = Number(process.env[key]);
   return Number.isFinite(value) ? value : fallback;
+}
+
+function quoteEnvValue(value) {
+  return `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
+function persistEnvValue(key, value) {
+  const envPath = path.join(rootDir, '.env');
+  const line = `${key}=${quoteEnvValue(value)}`;
+  const current = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+  const pattern = new RegExp(`^\\s*${key}\\s*=.*$`, 'm');
+  const next = pattern.test(current)
+    ? current.replace(pattern, line)
+    : `${current}${current && !current.endsWith('\n') ? '\n' : ''}${line}\n`;
+  fs.writeFileSync(envPath, next);
+}
+
+function switchProvider(nextProviderName) {
+  const nextProvider = createDigitalHumanProvider(nextProviderName);
+  jobRunner.stop();
+  providerName = nextProviderName;
+  provider = nextProvider;
+  process.env.DIGITAL_HUMAN_PROVIDER = nextProviderName;
+  jobRunner = new JobRunner({ prisma, provider, providerName });
+  jobRunner.start();
 }
 
 function buildCostConfig() {
@@ -280,6 +339,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     ok: true,
     provider: providerName,
+    providers: providerOptions(),
     scriptLimit: scriptLimit(),
     scriptLimitMessage: scriptLimitMessage(),
     aliyun: {
@@ -299,6 +359,33 @@ app.get('/api/health', (req, res) => {
     cost: buildCostConfig(),
   });
 });
+
+app.post('/api/providers', asyncHandler(async (req, res) => {
+  await currentUserId(req);
+  const nextProviderName = normalizeProviderName(req.body.provider);
+  const supported = providerOptions().map((item) => item.id);
+  if (!supported.includes(nextProviderName)) {
+    return res.status(400).json({ error: `不支持的模式：${req.body.provider}` });
+  }
+  const activeCount = await prisma.generationJob.count({
+    where: { status: { in: ['pending', 'running'] } },
+  });
+  if (activeCount > 0) {
+    return res.status(409).json({ error: '当前有生成任务正在运行，完成或取消后再切换模式。' });
+  }
+  if (nextProviderName !== providerName) {
+    persistEnvValue('DIGITAL_HUMAN_PROVIDER', nextProviderName);
+    switchProvider(nextProviderName);
+  }
+  res.json({
+    ok: true,
+    provider: providerName,
+    providers: providerOptions(),
+    scriptLimit: scriptLimit(),
+    scriptLimitMessage: scriptLimitMessage(),
+    cost: buildCostConfig(),
+  });
+}));
 
 app.get('/api/avatars', asyncHandler(async (req, res) => {
   const userId = await currentUserId(req);

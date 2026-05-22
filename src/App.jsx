@@ -478,7 +478,7 @@ function App() {
     }
 
     if (activeView === 'api') return <ApiPage />;
-    return <SettingsPage setToast={setToast} systemConfig={systemConfig} />;
+    return <SettingsPage setToast={setToast} systemConfig={systemConfig} refreshAll={refreshAll} />;
   }, [
     activeView,
     avatars,
@@ -1986,16 +1986,85 @@ function ApiPage() {
   );
 }
 
-function SettingsPage({ setToast, systemConfig }) {
+function SettingsPage({ setToast, systemConfig, refreshAll }) {
+  const [switching, setSwitching] = useState('');
   const providerLabel = systemConfig.provider === 'aliyun'
     ? `aliyun · ${systemConfig.aliyun?.configured ? 'API Key 已配置' : '缺少 API Key'}`
     : systemConfig.provider === 'heygen'
       ? `heygen · ${systemConfig.heygen?.configured ? 'API Key 已配置' : '缺少 API Key'} · ${systemConfig.heygen?.aspectRatio || '9:16'}`
     : systemConfig.provider;
+  const providerOptions = systemConfig.providers || [
+    { id: 'mock', name: 'Mock 本地模拟', configured: true, description: '不调用付费接口，适合测试流程。' },
+    { id: 'aliyun', name: '阿里百炼', configured: Boolean(systemConfig.aliyun?.configured), description: '阿里 TTS + 数字人生成。' },
+    { id: 'heygen', name: 'HeyGen 高质量数字人', configured: Boolean(systemConfig.heygen?.configured), description: 'HeyGen 官方 Avatar API。' },
+    { id: 'did', name: 'D-ID 数字人口播', configured: false, description: 'D-ID Talks API。' },
+  ];
+
+  async function switchProvider(nextProvider) {
+    if (nextProvider === systemConfig.provider) {
+      setToast('当前已经是这个模式');
+      return;
+    }
+    setSwitching(nextProvider);
+    try {
+      const result = await apiFetch('/api/providers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: nextProvider }),
+      });
+      setToast(`已切换到 ${providerOptions.find((item) => item.id === result.provider)?.name || result.provider}`);
+      refreshAll({ silent: true });
+    } catch (error) {
+      setToast(error.message);
+    } finally {
+      setSwitching('');
+    }
+  }
+
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-panel">
       <h2 className="text-xl font-black text-slate-950">设置</h2>
       <p className="mt-1 text-sm text-slate-500">默认输出竖屏视频；mock 为离线兜底，aliyun / heygen / did 可接真实口播生成。</p>
+
+      <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+        <div className="mb-3 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+          <div>
+            <h3 className="font-black text-slate-950">生成引擎</h3>
+            <p className="mt-1 text-xs text-slate-500">切换会保存到本地 .env；有任务运行时不能切换。</p>
+          </div>
+          <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-black text-white">当前：{providerDisplayName(systemConfig)}</span>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {providerOptions.map((item) => {
+            const active = item.id === systemConfig.provider;
+            return (
+              <button
+                key={item.id}
+                className={`rounded-2xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-70 ${
+                  active
+                    ? 'border-blue-500 bg-white shadow-soft ring-4 ring-blue-100'
+                    : 'border-slate-200 bg-white hover:border-blue-200 hover:shadow-sm'
+                }`}
+                type="button"
+                onClick={() => switchProvider(item.id)}
+                disabled={Boolean(switching)}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-black text-slate-900">{item.name}</div>
+                    <div className="mt-1 text-xs leading-5 text-slate-500">{item.description}</div>
+                  </div>
+                  {switching === item.id ? <Loader2 className="h-4 w-4 animate-spin text-blue-600" /> : active ? <CheckCircle2 className="h-4 w-4 text-blue-600" /> : null}
+                </div>
+                <div className={`mt-3 inline-flex rounded-full px-2 py-1 text-xs font-black ${item.configured ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                  {item.configured ? '已配置' : '缺少 Key'}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         {[
           ['默认输出比例', '9:16 竖屏视频'],
