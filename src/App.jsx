@@ -57,6 +57,13 @@ const defaultScript =
 const subtitleOptions = ['关键词高亮', '清爽白字', '重点描边', '商务蓝', '新闻下三分之一'];
 const backgroundOptions = ['保留原图背景', '简约直播间', '书房背景', '企业展厅', '课堂背景', '新闻演播厅', '纯色背景', '自定义背景'];
 const introOutroOptions = ['无片头片尾', '品牌片头 + 福利片尾', '标题片头 + 总结片尾', 'Logo 片头 + 联系方式片尾', '课程标题片头 + 报名片尾'];
+const audioSyncOptions = [
+  { value: 0, label: '不校准' },
+  { value: 100, label: '音频延后 100ms' },
+  { value: 200, label: '音频延后 200ms（推荐）' },
+  { value: 300, label: '音频延后 300ms' },
+  { value: -100, label: '音频提前 100ms' },
+];
 const templateCategories = ['全部', '电商口播', '知识讲解', '企业宣传', '课程讲解', '新闻播报'];
 
 const statusMap = {
@@ -231,6 +238,7 @@ function App() {
   const [subtitleStyle, setSubtitleStyle] = useState('关键词高亮');
   const [backgroundConfig, setBackgroundConfig] = useState('简约直播间');
   const [backgroundImageUrl, setBackgroundImageUrl] = useState('');
+  const [audioSyncOffsetMs, setAudioSyncOffsetMs] = useState(200);
   const [introOutroConfig, setIntroOutroConfig] = useState('品牌片头 + 福利片尾');
   const [toast, setToast] = useState('');
   const [error, setError] = useState('');
@@ -380,6 +388,7 @@ function App() {
           subtitleStyle: isHeyGenMode(systemConfig) ? '暂未启用字幕样式' : subtitleStyle,
           backgroundConfig,
           backgroundImageUrl,
+          audioSyncOffsetMs,
           introOutroConfig: isHeyGenMode(systemConfig) ? '无片头片尾' : introOutroConfig,
         }),
       });
@@ -431,6 +440,7 @@ function App() {
     setSubtitleStyle(project.job?.subtitleStyle || '关键词高亮');
     setBackgroundConfig(project.job?.backgroundConfig || '简约直播间');
     setBackgroundImageUrl(project.job?.backgroundImageUrl || '');
+    setAudioSyncOffsetMs(project.job?.audioSyncOffsetMs ?? 200);
     setIntroOutroConfig(project.job?.introOutroConfig || '品牌片头 + 福利片尾');
     setActiveView('create');
     setToast(`已复用作品「${project.title}」配置`);
@@ -468,6 +478,8 @@ function App() {
           setBackgroundConfig={setBackgroundConfig}
           backgroundImageUrl={backgroundImageUrl}
           setBackgroundImageUrl={setBackgroundImageUrl}
+          audioSyncOffsetMs={audioSyncOffsetMs}
+          setAudioSyncOffsetMs={setAudioSyncOffsetMs}
           introOutroConfig={introOutroConfig}
           setIntroOutroConfig={setIntroOutroConfig}
           busy={busy}
@@ -515,6 +527,7 @@ function App() {
     avatars,
     backgroundConfig,
     backgroundImageUrl,
+    audioSyncOffsetMs,
     busy,
     introOutroConfig,
     jobs,
@@ -678,6 +691,8 @@ function CreateVideoPage({
   setBackgroundConfig,
   backgroundImageUrl,
   setBackgroundImageUrl,
+  audioSyncOffsetMs,
+  setAudioSyncOffsetMs,
   introOutroConfig,
   setIntroOutroConfig,
   busy,
@@ -780,6 +795,8 @@ function CreateVideoPage({
             setBackgroundConfig={setBackgroundConfig}
             backgroundImageUrl={backgroundImageUrl}
             setBackgroundImageUrl={setBackgroundImageUrl}
+            audioSyncOffsetMs={audioSyncOffsetMs}
+            setAudioSyncOffsetMs={setAudioSyncOffsetMs}
             introOutroConfig={introOutroConfig}
             setIntroOutroConfig={setIntroOutroConfig}
             handleGenerate={handleGenerate}
@@ -958,6 +975,8 @@ function SettingsPanel({
   setBackgroundConfig,
   backgroundImageUrl,
   setBackgroundImageUrl,
+  audioSyncOffsetMs,
+  setAudioSyncOffsetMs,
   introOutroConfig,
   setIntroOutroConfig,
   handleGenerate,
@@ -1120,6 +1139,15 @@ function SettingsPanel({
           <div className="mb-3 rounded-xl bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-800">
             选择「保留原图背景」时不会抠图换背景；其他背景会传给 HeyGen，并尝试抠除原背景。上传自定义背景后会优先使用你的背景图。
           </div>
+        ) : null}
+        {heygen ? (
+          <SelectInput
+            label="口型同步校准"
+            value={audioSyncOffsetMs}
+            options={audioSyncOptions}
+            onChange={(value) => setAudioSyncOffsetMs(Number(value))}
+            helper="如果嘴巴比声音慢，选择音频延后；如果声音比嘴巴慢，选择音频提前。"
+          />
         ) : null}
         <SelectInput
           label={heygen ? '片头片尾（HeyGen 暂未接入）' : '片头片尾'}
@@ -2296,6 +2324,7 @@ function JobDetailModal({ job, onClose }) {
         <InfoRow label="字幕样式" value={job.subtitleStyle} />
         <InfoRow label="背景设置" value={job.backgroundConfig} />
         {job.backgroundImageUrl ? <InfoRow label="自定义背景" value={job.backgroundImageUrl} /> : null}
+        {job.audioSyncOffsetMs ? <InfoRow label="口型校准" value={`${job.audioSyncOffsetMs > 0 ? '音频延后' : '音频提前'} ${Math.abs(job.audioSyncOffsetMs)}ms`} /> : null}
         <InfoRow label="片头片尾" value={job.introOutroConfig} />
         {job.errorMessage ? (
           <div className="rounded-xl border border-rose-100 bg-rose-50 p-3 text-rose-700">

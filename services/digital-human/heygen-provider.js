@@ -1,6 +1,8 @@
 import fsp from 'node:fs/promises';
+import { execFile as execFileCallback } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 
 import { DigitalHumanProvider, estimateDuration } from './provider.js';
 import { toPublicUrl } from './public-url.js';
@@ -9,6 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '../..');
 const projectDir = path.join(rootDir, 'public/uploads/projects');
+const execFile = promisify(execFileCallback);
 
 export class HeyGenProvider extends DigitalHumanProvider {
   constructor() {
@@ -43,7 +46,7 @@ export class HeyGenProvider extends DigitalHumanProvider {
       throw new Error(`HeyGen 视频已完成，但响应中没有 video_url：${safeStringify(polled.payload).slice(0, 260)}`);
     }
 
-    const localVideoUrl = await this.downloadVideo(polled.videoUrl, job.id);
+    const localVideoUrl = await this.downloadVideo(polled.videoUrl, job);
     return {
       providerTaskId: job.providerTaskId,
       providerStatus: polled.status || 'completed',
@@ -128,9 +131,11 @@ export class HeyGenProvider extends DigitalHumanProvider {
     };
   }
 
-  async downloadVideo(videoUrl, jobId) {
+  async downloadVideo(videoUrl, job) {
     await fsp.mkdir(projectDir, { recursive: true });
-    const outputPath = path.join(projectDir, `${jobId}.mp4`);
+    const offsetMs = Number.parseInt(job.audioSyncOffsetMs ?? process.env.HEYGEN_AUDIO_SYNC_OFFSET_MS ?? '0', 10) || 0;
+    const outputPath = path.join(projectDir, `${job.id}.mp4`);
+    const rawPath = offsetMs ? path.join(projectDir, `${job.id}-raw.mp4`) : outputPath;
     const response = await fetch(videoUrl);
     if (!response.ok) {
       throw new Error(`下载 HeyGen 视频失败：HTTP ${response.status}`);
@@ -139,8 +144,12 @@ export class HeyGenProvider extends DigitalHumanProvider {
     if (!buffer.length) {
       throw new Error('下载 HeyGen 视频失败：返回内容为空');
     }
-    await fsp.writeFile(outputPath, buffer);
-    return `/uploads/projects/${jobId}.mp4`;
+    await fsp.writeFile(rawPath, buffer);
+    if (offsetMs) {
+      await adjustAudioSync(rawPath, outputPath, offsetMs);
+      await fsp.rm(rawPath, { force: true });
+    }
+    return `/uploads/projects/${job.id}.mp4`;
   }
 
   async listAvatars() {
@@ -299,6 +308,30 @@ function buildCaptionSetting(subtitleStyle) {
     file_format: 'srt',
     style: 'default',
   };
+}
+
+async function adjustAudioSync(inputPath, outputPath, offsetMs) {
+  const ms = Math.abs(Number(offsetMs) || 0);
+  if (!ms) {
+    await fsp.copyFile(inputPath, outputPath);
+    return;
+  }
+
+  const audioFilter = offsetMs > 0
+    ? `adelay=${ms}:all=1`
+    : `atrim=start=${(ms / 1000).toFixed(3)},asetpts=PTS-STARTPTS`;
+
+  await execFile('ffmpeg', [
+    '-y',
+    '-i', inputPath,
+    '-filter_complex', `[0:a]${audioFilter}[a]`,
+    '-map', '0:v:0',
+    '-map', '[a]',
+    '-c:v', 'copy',
+    '-c:a', 'aac',
+    '-shortest',
+    outputPath,
+  ], { timeout: 120000 });
 }
 
 function buildVoiceSettings(voice) {

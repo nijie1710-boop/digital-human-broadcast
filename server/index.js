@@ -823,6 +823,7 @@ app.post('/api/jobs', asyncHandler(async (req, res) => {
     subtitleStyle: req.body.subtitleStyle || '关键词高亮',
     backgroundConfig: req.body.backgroundConfig || '简约直播间',
     backgroundImageUrl: req.body.backgroundImageUrl || null,
+    audioSyncOffsetMs: Number.parseInt(req.body.audioSyncOffsetMs || '0', 10) || 0,
     introOutroConfig: req.body.introOutroConfig || '无片头片尾',
   });
   res.status(201).json(job);
