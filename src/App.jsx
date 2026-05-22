@@ -1055,7 +1055,7 @@ function SettingsPanel({
         <SelectInput label="背景设置" value={backgroundConfig} options={backgroundOptions} onChange={setBackgroundConfig} />
         {heygen ? (
           <div className="mb-3 rounded-xl bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-800">
-            背景设置会实际传给 HeyGen。非「简约直播间」会尝试抠除原背景并设置背景色；如果该 Avatar 不支持抠像，任务会返回失败原因。
+            背景设置会实际传给 HeyGen。系统会传入场景背景图并尝试抠除原背景；如果该 Avatar 不支持抠像，任务会返回失败原因。
           </div>
         ) : null}
         <SelectInput
@@ -2256,7 +2256,9 @@ function JobDetailModal({ job, onClose }) {
 function VideoPreviewModal({ project, onClose }) {
   return (
     <Modal title={project.title} onClose={onClose} wide>
-      <video className="max-h-[70vh] w-full rounded-2xl bg-black" src={project.videoUrl} controls poster={project.coverUrl} />
+      <div className="mx-auto max-h-[72vh] w-full max-w-[420px] overflow-hidden rounded-2xl bg-black">
+        <video className="aspect-[9/16] h-full w-full object-contain" src={project.videoUrl} controls poster={project.coverUrl} />
+      </div>
       <div className="mt-3 flex items-center justify-between text-sm text-slate-500">
         <span>{project.duration} · {project.avatar?.name}</span>
         <a className="rounded-xl bg-blue-600 px-4 py-2 font-black text-white" href={project.videoUrl} download>下载视频</a>

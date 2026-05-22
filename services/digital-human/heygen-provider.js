@@ -252,12 +252,11 @@ export class HeyGenProvider extends DigitalHumanProvider {
 
 function buildBackgroundSetting(backgroundConfig) {
   const value = String(backgroundConfig || '').trim();
-  const imageUrl = process.env.HEYGEN_BACKGROUND_IMAGE_URL;
-  if (imageUrl && value !== '简约直播间') {
-    return { type: 'image', url: toPublicUrl(imageUrl) };
-  }
+  const imageUrl = backgroundImageUrl(value);
+  if (imageUrl) return { type: 'image', url: toPublicUrl(imageUrl) };
 
   const color = {
+    简约直播间: '#f2eadc',
     书房背景: '#eadfce',
     企业展厅: '#eef2f7',
     课堂背景: '#e8f2ff',
@@ -266,6 +265,28 @@ function buildBackgroundSetting(backgroundConfig) {
   }[value];
 
   return color ? { type: 'color', value: color } : null;
+}
+
+function backgroundImageUrl(value) {
+  const key = {
+    简约直播间: 'HEYGEN_BACKGROUND_LIVEROOM_URL',
+    书房背景: 'HEYGEN_BACKGROUND_STUDY_URL',
+    企业展厅: 'HEYGEN_BACKGROUND_SHOWROOM_URL',
+    课堂背景: 'HEYGEN_BACKGROUND_CLASSROOM_URL',
+    新闻演播厅: 'HEYGEN_BACKGROUND_NEWSROOM_URL',
+    纯色背景: 'HEYGEN_BACKGROUND_SOLID_URL',
+  }[value];
+  const configured = key ? process.env[key] : '';
+  if (configured) return configured;
+  if (process.env.HEYGEN_BACKGROUND_IMAGE_URL) return process.env.HEYGEN_BACKGROUND_IMAGE_URL;
+
+  return {
+    简约直播间: 'https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=1080&h=1920&q=85',
+    书房背景: 'https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1080&h=1920&q=85',
+    企业展厅: 'https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=1080&h=1920&q=85',
+    课堂背景: 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&w=1080&h=1920&q=85',
+    新闻演播厅: 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1080&h=1920&q=85',
+  }[value] || '';
 }
 
 function buildCaptionSetting(subtitleStyle) {

@@ -66,6 +66,12 @@ HEYGEN_ENABLE_CAPTIONS="false"
 HEYGEN_ENABLE_MOTION_PROMPT="false"
 HEYGEN_MOTION_PROMPT=""
 HEYGEN_BACKGROUND_IMAGE_URL=""
+HEYGEN_BACKGROUND_LIVEROOM_URL=""
+HEYGEN_BACKGROUND_STUDY_URL=""
+HEYGEN_BACKGROUND_SHOWROOM_URL=""
+HEYGEN_BACKGROUND_CLASSROOM_URL=""
+HEYGEN_BACKGROUND_NEWSROOM_URL=""
+HEYGEN_BACKGROUND_SOLID_URL=""
 HEYGEN_REMOVE_BACKGROUND_NOISE="true"
 ```
 
@@ -100,8 +106,8 @@ npm run check:heygen
 
 - 选择带 `providerAvatarId` 的 HeyGen 数字人时，系统会调用 HeyGen 官方 Avatar。
 - 选择没有 `providerAvatarId` 的本地上传数字人时，系统会走 HeyGen `image-to-video`，用上传的形象图生成口播。此时图片必须通过 `PUBLIC_BASE_URL` 公网可访问。
-- 工作台里的「背景设置」会传给 HeyGen。选择非「简约直播间」背景时，系统会开启 `remove_background` 并传入背景颜色；如果账号或 Avatar 不支持抠像，HeyGen 会返回失败原因。
-- 如果配置了 `HEYGEN_BACKGROUND_IMAGE_URL`，非默认背景会优先使用该公网图片作为背景图。
+- 工作台里的「背景设置」会传给 HeyGen。系统会开启 `remove_background` 并传入场景背景图；如果账号或 Avatar 不支持抠像，HeyGen 会返回失败原因。
+- 可以用 `HEYGEN_BACKGROUND_LIVEROOM_URL`、`HEYGEN_BACKGROUND_STUDY_URL` 等变量覆盖每个背景选项。只配置 `HEYGEN_BACKGROUND_IMAGE_URL` 时，所有背景选项都会使用同一张公网背景图。
 - HeyGen 模式下「字幕样式」和「片头片尾」当前不合成到最终视频里。页面会禁用这两项，任务保存为“暂未启用/无片头片尾”。后续要做成品级字幕和片头片尾，建议在 HeyGen 输出后增加本地 FFmpeg 后处理。
 
 生成前页面会弹出 HeyGen 确认框，显示预计时长、预计费用、当前 Avatar/Voice、分辨率和画幅。费用只是按 `.env` 中的 `HEYGEN_PRICE_USD_PER_SECOND` 与 `USD_TO_CNY_RATE` 做的生成前估算，实际扣费以 HeyGen 后台为准。
