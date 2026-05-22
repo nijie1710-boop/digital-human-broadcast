@@ -69,9 +69,11 @@ export class HeyGenProvider extends DigitalHumanProvider {
       script: job.script,
       voice_id: voiceId,
       fit: process.env.HEYGEN_AVATAR_FIT || 'contain',
-      caption: buildCaptionSetting(job.subtitleStyle),
       voice_settings: buildVoiceSettings(job.voice),
     };
+    const caption = buildCaptionSetting(job.subtitleStyle);
+    if (caption) basePayload.caption = caption;
+
     const background = buildBackgroundSetting(job.backgroundConfig);
     if (background) {
       basePayload.background = background;
@@ -267,6 +269,7 @@ function buildBackgroundSetting(backgroundConfig) {
 }
 
 function buildCaptionSetting(subtitleStyle) {
+  if (process.env.HEYGEN_ENABLE_CAPTIONS !== 'true') return null;
   const value = String(subtitleStyle || '').trim();
   if (!value || value === '无字幕') return null;
   return {

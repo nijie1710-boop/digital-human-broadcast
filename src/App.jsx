@@ -187,6 +187,24 @@ function providerDisplayName(systemConfig) {
   return 'Mock 本地模拟';
 }
 
+function providerIdDisplayName(provider) {
+  if (provider === 'heygen') return 'HeyGen';
+  if (provider === 'aliyun') return '阿里';
+  if (provider === 'did') return 'D-ID';
+  return '外部服务';
+}
+
+function resolveVoiceProvider({ voice, systemConfig, providerVoiceId, clone }) {
+  const existingProvider = voice?.provider && voice.provider !== 'mock' ? voice.provider : '';
+  const activeProvider = systemConfig.provider || 'mock';
+  if (providerVoiceId.trim()) {
+    if (existingProvider) return existingProvider;
+    if (activeProvider === 'aliyun' || activeProvider === 'heygen' || activeProvider === 'did') return activeProvider;
+    return 'heygen';
+  }
+  return voice?.provider || (clone ? activeProvider : 'mock');
+}
+
 function getScriptLimit(systemConfig) {
   return Number(systemConfig.scriptLimit || (systemConfig.provider === 'aliyun' ? 120 : 3000));
 }
@@ -358,9 +376,9 @@ function App() {
           script: text,
           avatarId: selectedAvatarId,
           voiceId: selectedVoiceId,
-          subtitleStyle,
+          subtitleStyle: isHeyGenMode(systemConfig) ? '暂未启用字幕样式' : subtitleStyle,
           backgroundConfig,
-          introOutroConfig,
+          introOutroConfig: isHeyGenMode(systemConfig) ? '无片头片尾' : introOutroConfig,
         }),
       });
       setJobs((items) => [job, ...items]);
@@ -1026,14 +1044,28 @@ function SettingsPanel({
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <h3 className="mb-3 font-black text-slate-900">视频设置</h3>
-        <SelectInput label="字幕样式" value={subtitleStyle} options={subtitleOptions} onChange={setSubtitleStyle} />
+        <SelectInput
+          label={heygen ? '字幕样式（HeyGen 暂未接入）' : '字幕样式'}
+          value={subtitleStyle}
+          options={subtitleOptions}
+          onChange={setSubtitleStyle}
+          disabled={heygen}
+          helper={heygen ? '当前不会传入字幕样式；后续需要用 FFmpeg 后处理统一烧录字幕。' : ''}
+        />
         <SelectInput label="背景设置" value={backgroundConfig} options={backgroundOptions} onChange={setBackgroundConfig} />
         {heygen ? (
           <div className="mb-3 rounded-xl bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-800">
-            HeyGen 模式会把非「简约直播间」背景传给官方 API，并尝试抠除原背景；如果该 Avatar 不支持抠像，任务会返回失败原因。
+            背景设置会实际传给 HeyGen。非「简约直播间」会尝试抠除原背景并设置背景色；如果该 Avatar 不支持抠像，任务会返回失败原因。
           </div>
         ) : null}
-        <SelectInput label="片头片尾" value={introOutroConfig} options={introOutroOptions} onChange={setIntroOutroConfig} />
+        <SelectInput
+          label={heygen ? '片头片尾（HeyGen 暂未接入）' : '片头片尾'}
+          value={introOutroConfig}
+          options={introOutroOptions}
+          onChange={setIntroOutroConfig}
+          disabled={heygen}
+          helper={heygen ? '当前 HeyGen 直接输出口播正片，不会合成片头片尾；后续需要加本地 FFmpeg 合成。' : ''}
+        />
         <CostEstimateCard estimate={costEstimate} />
         <button
           className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-sm font-black text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
@@ -1553,6 +1585,17 @@ function VoiceModal({ modal, onClose, refreshAll, setToast, setSelectedVoiceId, 
   const cloneHelper = heygen
     ? '勾选后会调用 HeyGen Voice Clone。建议上传 30-120 秒干净人声，完成后系统会自动保存 HeyGen Voice ID，后续生成就使用你的声音。'
     : '勾选后会调用当前 provider 的音色复刻接口，成功后保存音色 ID；后续选择这个声音生成视频时，会优先使用你的克隆音色。';
+  const resolvedProvider = resolveVoiceProvider({ voice, systemConfig, providerVoiceId, clone });
+  const providerName = providerIdDisplayName(resolvedProvider);
+  const providerIdLabel = resolvedProvider === 'heygen'
+    ? 'HeyGen Voice ID（可选）'
+    : `${providerName}音色 ID（可选）`;
+  const providerIdPlaceholder = resolvedProvider === 'heygen'
+    ? '例如 voice_xxx；已有 HeyGen 音色才填写'
+    : '已有音色 ID 可填写；留空并上传样本则提交克隆';
+  const providerIdSavedMessage = resolvedProvider === 'heygen'
+    ? 'HeyGen Voice ID 已保存'
+    : `${providerName}音色 ID 已保存`;
 
   useEffect(() => {
     if (!file) {
@@ -1571,7 +1614,7 @@ function VoiceModal({ modal, onClose, refreshAll, setToast, setSelectedVoiceId, 
       return;
     }
     if (!file && !voice && !providerVoiceId.trim()) {
-      setToast('请上传 wav/mp3/m4a 声音样本，或填写 HeyGen Voice ID');
+      setToast(`请上传 wav/mp3/m4a 声音样本，或填写${providerName}音色 ID`);
       return;
     }
     const form = new FormData();
@@ -1579,7 +1622,7 @@ function VoiceModal({ modal, onClose, refreshAll, setToast, setSelectedVoiceId, 
     form.append('gender', gender);
     form.append('language', language);
     form.append('style', style);
-    form.append('provider', providerVoiceId.trim() ? 'heygen' : (voice?.provider || (clone ? systemConfig.provider : 'mock')));
+    form.append('provider', resolvedProvider);
     form.append('providerVoiceId', providerVoiceId.trim());
     form.append('clone', String(clone && !providerVoiceId.trim()));
     form.append('isDefault', String(isDefault));
@@ -1589,7 +1632,7 @@ function VoiceModal({ modal, onClose, refreshAll, setToast, setSelectedVoiceId, 
       const savedVoice = await apiFetch(voice ? `/api/voices/${voice.id}` : '/api/voices', { method: voice ? 'PUT' : 'POST', body: form });
       if (savedVoice.status === 'ready') setSelectedVoiceId(savedVoice.id);
       const message = providerVoiceId.trim()
-        ? 'HeyGen Voice ID 已保存'
+        ? providerIdSavedMessage
         : clone && savedVoice.status === 'pending'
           ? (heygen ? 'HeyGen 声音克隆已提交，完成后会自动变为可用' : '声音样本已上传，当前进入克隆队列')
           : clone
@@ -1612,11 +1655,11 @@ function VoiceModal({ modal, onClose, refreshAll, setToast, setSelectedVoiceId, 
         <SelectInput label="性别" value={gender} options={['女性', '男性', '中性']} onChange={setGender} />
         <TextField label="语言" value={language} onChange={setLanguage} />
         <TextField label="风格" value={style} onChange={setStyle} />
-        <TextField label="HeyGen Voice ID（可选）" value={providerVoiceId} onChange={setProviderVoiceId} placeholder="例如 voice_xxx；留空则使用 .env 默认值" />
+        <TextField label={providerIdLabel} value={providerVoiceId} onChange={setProviderVoiceId} placeholder={providerIdPlaceholder} />
         <FileDropzone
           label="声音样本 wav/mp3/m4a"
           accept="audio/mp3,audio/mpeg,audio/wav,audio/x-wav,audio/mp4,audio/x-m4a,.mp3,.wav,.m4a"
-          helper={voice ? '可选。重新拖入可替换声音样本。' : '支持拖拽上传。若只使用 HeyGen Voice ID，可以不上传样本；要克隆自己的声音必须上传样本。'}
+          helper={voice ? '可选。重新拖入可替换声音样本。' : `支持拖拽上传。若只使用${providerName}音色 ID，可以不上传样本；要克隆自己的声音必须上传样本。`}
           file={file}
           onFile={setFile}
           onInvalid={() => setToast('声音样本只支持 wav/mp3/m4a')}
@@ -1624,7 +1667,7 @@ function VoiceModal({ modal, onClose, refreshAll, setToast, setSelectedVoiceId, 
           mediaType="audio"
         />
         <div className="rounded-2xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-800">
-          {providerVoiceId.trim() ? '已填写 Voice ID，系统会直接使用这个音色，不再提交克隆任务。' : cloneHelper}
+          {providerVoiceId.trim() ? `已填写${providerName}音色 ID，系统会直接使用这个音色，不再提交克隆任务。` : cloneHelper}
         </div>
         <label className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600">
           <input type="checkbox" checked={clone} onChange={(event) => setClone(event.target.checked)} disabled={Boolean(providerVoiceId.trim())} />
@@ -2266,14 +2309,20 @@ function MetricCard({ icon: Icon, label, value, hint, tone = 'blue' }) {
   );
 }
 
-function SelectInput({ label, value, options, onChange }) {
+function SelectInput({ label, value, options, onChange, disabled = false, helper = '' }) {
   const normalized = options.map((option) => (typeof option === 'string' ? { value: option, label: option } : option));
   return (
     <label className="block">
       <span className="mb-1 block text-xs font-bold text-slate-500">{label}</span>
-      <select className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none" value={value} onChange={(event) => onChange(event.target.value)}>
+      <select
+        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none disabled:bg-slate-100 disabled:text-slate-400"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        disabled={disabled}
+      >
         {normalized.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
+      {helper ? <span className="mt-1 block text-xs leading-5 text-slate-400">{helper}</span> : null}
     </label>
   );
 }
