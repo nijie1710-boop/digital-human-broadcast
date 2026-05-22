@@ -65,6 +65,7 @@ HEYGEN_REMOVE_BACKGROUND="true"
 HEYGEN_ENABLE_MOTION_PROMPT="false"
 HEYGEN_MOTION_PROMPT=""
 HEYGEN_BACKGROUND_IMAGE_URL=""
+HEYGEN_REMOVE_BACKGROUND_NOISE="true"
 ```
 
 真实 key 只放本地 `.env`，不要提交到 GitHub。
@@ -78,6 +79,21 @@ npm run check:heygen
 脚本会请求 HeyGen 的 avatars / voices 列表并打印可复制的 ID，不会打印 API Key。拿到 ID 后可以填到 `.env` 的 `HEYGEN_DEFAULT_AVATAR_ID` / `HEYGEN_DEFAULT_VOICE_ID`，也可以在「数字人形象」和「声音库」里分别填写 `providerAvatarId` / `providerVoiceId`。
 
 也可以在页面的「数字人形象与声音库」点击「同步 HeyGen 资源」，系统会把 HeyGen 账号里的 Avatar 和 Voice 同步到本地 SQLite，后续可直接在工作台选择。
+
+### HeyGen 克隆自己的声音
+
+声音库点击「上传/克隆声音」，上传 `wav/mp3/m4a` 干净人声样本并勾选「进入声音克隆流程」。
+
+建议样本：
+
+- 30-120 秒
+- 单人说话，无背景音乐
+- 环境噪声低，嘴不要离麦克风太远
+- 普通话样本的语言填「普通话」或「中文」
+
+提交后系统会调用 `POST /v3/voices/clone` 创建 HeyGen 声音克隆任务，保存返回的 `voice_clone_id`，再由后台轮询 `GET /v3/voices/{voice_id}`。状态变成「可用」后，工作台选择这个声音生成视频时会使用你的克隆音色。克隆失败时，声音库会显示 HeyGen 返回的失败原因。
+
+如果声音样本保存在本地 `/uploads/...`，必须配置公网可访问的 `PUBLIC_BASE_URL`，例如 ngrok 或 Cloudflare Tunnel 地址；HeyGen 无法访问 `localhost` 文件。
 
 数字人生成规则：
 

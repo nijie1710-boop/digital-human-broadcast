@@ -163,6 +163,66 @@ export class HeyGenProvider extends DigitalHumanProvider {
     return { avatars, voices };
   }
 
+  async cloneVoice({ voice }) {
+    const audioUrl = toPublicUrl(voice.sampleUrl);
+    const payload = {
+      audio: {
+        type: 'url',
+        url: audioUrl,
+      },
+      voice_name: voice.name || '我的克隆声音',
+      remove_background_noise: process.env.HEYGEN_REMOVE_BACKGROUND_NOISE === 'false' ? false : true,
+    };
+    const language = heygenLanguageHint(voice.language);
+    if (language) payload.language = language;
+
+    const response = await this.request('/v3/voices/clone', {
+      method: 'POST',
+      json: payload,
+    });
+    const voiceCloneId = findValue(response, ['voice_clone_id', 'voiceCloneId', 'voice_id', 'voiceId', 'id']);
+    if (!voiceCloneId) {
+      throw new Error(`HeyGen 声音克隆提交失败：响应缺少 voice_clone_id：${safeStringify(response).slice(0, 260)}`);
+    }
+
+    return {
+      provider: 'heygen',
+      providerVoiceId: String(voiceCloneId),
+      providerStatus: normalizeStatus(findValue(response, ['status', 'state']) || 'processing'),
+      providerPayload: response,
+      status: 'pending',
+    };
+  }
+
+  async pollVoiceClone({ voice }) {
+    const voiceId = voice.providerVoiceId;
+    if (!voiceId) {
+      throw new Error('HeyGen 声音克隆缺少 providerVoiceId，无法查询状态。');
+    }
+
+    const response = await this.request(`/v3/voices/${encodeURIComponent(voiceId)}`);
+    const payload = response.data || response;
+    const rawStatus = findValue(payload, ['status', 'state']) || 'processing';
+    const status = normalizeResourceStatus(rawStatus);
+    const normalized = normalizeVoiceResource({
+      ...payload,
+      voice_id: findValue(payload, ['voice_id', 'voiceId', 'id']) || voiceId,
+    });
+
+    return {
+      provider: 'heygen',
+      providerVoiceId: normalized.providerVoiceId || voiceId,
+      providerStatus: String(rawStatus),
+      providerPayload: response,
+      providerError: status === 'failed' ? (extractError(payload) || findValue(payload, ['failure_message', 'failureMessage'])) : null,
+      sampleUrl: normalized.sampleUrl || voice.sampleUrl,
+      duration: normalized.duration || voice.duration,
+      language: normalized.language && normalized.language !== 'Unknown' ? normalized.language : voice.language,
+      gender: normalized.gender || voice.gender,
+      status,
+    };
+  }
+
   async request(endpoint, { method = 'GET', json } = {}) {
     const apiKey = process.env.HEYGEN_API_KEY;
     if (!apiKey) {
@@ -224,6 +284,16 @@ function buildVoiceSettings(voice) {
     volume: Number(process.env.HEYGEN_VOICE_VOLUME || 1),
     ...(locale ? { locale } : {}),
   };
+}
+
+function heygenLanguageHint(language) {
+  const value = String(language || '').toLowerCase();
+  if (!value) return '';
+  if (value.includes('普通话') || value.includes('中文') || value.includes('chinese') || value.includes('zh')) return 'zh';
+  if (value.includes('english') || value.includes('英语') || value.includes('en')) return 'en';
+  if (value.includes('japanese') || value.includes('日语') || value.includes('ja')) return 'ja';
+  if (value.includes('korean') || value.includes('韩语') || value.includes('ko')) return 'ko';
+  return '';
 }
 
 function buildMotionPrompt(job) {
@@ -334,7 +404,7 @@ function normalizeGender(value) {
 
 function normalizeResourceStatus(value) {
   const status = String(value || '').toLowerCase();
-  if (['active', 'ready', 'success', 'completed', 'available'].includes(status)) return 'ready';
+  if (['active', 'ready', 'success', 'completed', 'complete', 'available'].includes(status)) return 'ready';
   if (['failed', 'error', 'disabled'].includes(status)) return 'failed';
   if (['pending', 'processing', 'training'].includes(status)) return 'pending';
   return 'ready';
@@ -381,7 +451,7 @@ function heygenErrorMessage(payload, status) {
 function extractError(payload) {
   if (!payload) return '';
   if (typeof payload === 'string') return payload;
-  return findValue(payload, ['message', 'error', 'error_msg', 'errorMessage', 'detail', 'description']);
+  return findValue(payload, ['message', 'error', 'error_msg', 'errorMessage', 'detail', 'description', 'failure_message', 'failureMessage']);
 }
 
 function durationToText(value) {

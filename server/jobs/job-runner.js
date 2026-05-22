@@ -340,12 +340,83 @@ export class JobRunner {
   }
 
   async advanceVoiceClones() {
+    const pendingVoices = await this.prisma.voice.findMany({
+      where: { status: 'pending', NOT: { status: 'deleted' } },
+    });
+
+    for (const voice of pendingVoices) {
+      if (await this.advanceProviderVoiceClone(voice)) continue;
+    }
+
     await this.prisma.voice.updateMany({
       where: {
         status: 'pending',
+        provider: { notIn: ['aliyun', 'heygen', 'hey-gen'] },
         createdAt: { lt: new Date(Date.now() - 8000) },
       },
       data: { status: 'ready' },
     });
+  }
+
+  async advanceProviderVoiceClone(voice) {
+    const voiceProvider = String(voice.provider || '').toLowerCase();
+    const activeProvider = String(this.providerName || '').toLowerCase();
+    const canPollHeyGen = voiceProvider === 'heygen'
+      && ['heygen', 'hey-gen'].includes(activeProvider)
+      && voice.providerVoiceId
+      && typeof this.provider.pollVoiceClone === 'function';
+
+    if (!canPollHeyGen) return false;
+
+    try {
+      const result = await this.provider.pollVoiceClone({ voice });
+      const payloadMeta = parsePayloadMeta(voice.providerPayload);
+      const requestedDefault = Boolean(payloadMeta.requestedDefault);
+      const status = result.status === 'ready' || result.status === 'failed' ? result.status : 'pending';
+      const updates = {
+        provider: result.provider || voice.provider,
+        providerVoiceId: result.providerVoiceId || voice.providerVoiceId,
+        providerStatus: result.providerStatus || voice.providerStatus,
+        providerPayload: stringifyPayload({
+          response: result.providerPayload || payloadMeta.response || {},
+          requestedDefault,
+        }),
+        providerError: result.providerError || null,
+        sampleUrl: result.sampleUrl || voice.sampleUrl,
+        duration: result.duration || voice.duration,
+        status,
+      };
+
+      if (status === 'ready' && requestedDefault) {
+        await this.prisma.voice.updateMany({ where: { userId: voice.userId }, data: { isDefault: false } });
+        updates.isDefault = true;
+      }
+      if (status === 'failed') updates.isDefault = false;
+
+      await this.prisma.voice.update({
+        where: { id: voice.id },
+        data: updates,
+      });
+    } catch (error) {
+      await this.prisma.voice.update({
+        where: { id: voice.id },
+        data: {
+          status: 'failed',
+          providerStatus: 'failed',
+          providerError: error.message,
+        },
+      });
+    }
+    return true;
+  }
+}
+
+function parsePayloadMeta(value) {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
   }
 }

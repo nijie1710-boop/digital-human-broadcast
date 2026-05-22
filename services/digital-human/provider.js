@@ -18,6 +18,10 @@ export class DigitalHumanProvider {
   async cloneVoice() {
     throw new Error(`${this.constructor.name}.cloneVoice is not configured`);
   }
+
+  async pollVoiceClone() {
+    throw new Error(`${this.constructor.name}.pollVoiceClone is not configured`);
+  }
 }
 
 export function estimateDuration(script) {

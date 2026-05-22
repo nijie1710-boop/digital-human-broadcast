@@ -509,19 +509,24 @@ app.post('/api/voices', upload.single('sample'), asyncHandler(async (req, res) =
     },
   });
 
-  if (shouldClone && !providerVoiceId && providerName === 'aliyun') {
+  if (shouldClone && !providerVoiceId && ['aliyun', 'heygen'].includes(providerName)) {
     try {
       const result = await provider.cloneVoice({ voice });
+      const requestedDefault = parseBool(req.body.isDefault);
+      const clonedStatus = result.status || (providerName === 'heygen' ? 'pending' : 'ready');
       const updates = {
         provider: result.provider || providerName,
         providerVoiceId: result.providerVoiceId,
         providerModel: result.providerModel,
         providerStatus: result.providerStatus,
-        providerPayload: JSON.stringify(result.providerPayload || {}),
+        providerPayload: JSON.stringify({
+          response: result.providerPayload || {},
+          requestedDefault,
+        }),
         providerError: null,
-        status: 'ready',
+        status: clonedStatus,
       };
-      if (parseBool(req.body.isDefault)) {
+      if (requestedDefault && clonedStatus === 'ready') {
         await prisma.voice.updateMany({ where: { userId }, data: { isDefault: false } });
         updates.isDefault = true;
       }
@@ -554,7 +559,8 @@ app.put('/api/voices/:id', upload.single('sample'), asyncHandler(async (req, res
   const sampleUrl = fileUrl(req.file) || req.body.sampleUrl || existing.sampleUrl;
   if (parseBool(req.body.isDefault)) await prisma.voice.updateMany({ where: { userId }, data: { isDefault: false } });
 
-  const voice = await prisma.voice.update({
+  const shouldClone = parseBool(req.body.clone) && !providerVoiceId;
+  let voice = await prisma.voice.update({
     where: { id: req.params.id },
     data: {
       name: req.body.name?.trim() || existing.name,
@@ -565,10 +571,49 @@ app.put('/api/voices/:id', upload.single('sample'), asyncHandler(async (req, res
       duration: req.body.duration || existing.duration,
       provider: req.body.provider || existing.provider,
       providerVoiceId,
-      status: req.body.status || (providerVoiceId ? 'ready' : existing.status),
-      isDefault: parseBool(req.body.isDefault) || (existing.isDefault && req.body.isDefault === undefined),
+      status: shouldClone ? 'pending' : (req.body.status || (providerVoiceId ? 'ready' : existing.status)),
+      isDefault: shouldClone ? false : (parseBool(req.body.isDefault) || (existing.isDefault && req.body.isDefault === undefined)),
     },
   });
+
+  if (shouldClone && ['aliyun', 'heygen'].includes(providerName)) {
+    try {
+      const result = await provider.cloneVoice({ voice });
+      const requestedDefault = parseBool(req.body.isDefault);
+      const clonedStatus = result.status || (providerName === 'heygen' ? 'pending' : 'ready');
+      const updates = {
+        provider: result.provider || providerName,
+        providerVoiceId: result.providerVoiceId,
+        providerModel: result.providerModel,
+        providerStatus: result.providerStatus,
+        providerPayload: JSON.stringify({
+          response: result.providerPayload || {},
+          requestedDefault,
+        }),
+        providerError: null,
+        status: clonedStatus,
+      };
+      if (requestedDefault && clonedStatus === 'ready') {
+        await prisma.voice.updateMany({ where: { userId }, data: { isDefault: false } });
+        updates.isDefault = true;
+      }
+      voice = await prisma.voice.update({
+        where: { id: voice.id },
+        data: updates,
+      });
+    } catch (error) {
+      voice = await prisma.voice.update({
+        where: { id: voice.id },
+        data: {
+          status: 'failed',
+          provider: providerName,
+          providerStatus: 'FAILED',
+          providerError: error.message,
+        },
+      });
+      return res.status(502).json({ error: `声音克隆失败：${error.message}`, voice });
+    }
+  }
   res.json(voice);
 }));
 
