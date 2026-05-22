@@ -57,6 +57,8 @@ HEYGEN_DEFAULT_AVATAR_ID="your-avatar-id"
 HEYGEN_DEFAULT_VOICE_ID="your-voice-id"
 HEYGEN_DEFAULT_RESOLUTION="1080p"
 HEYGEN_DEFAULT_ASPECT_RATIO="9:16"
+HEYGEN_PRICE_USD_PER_SECOND="0.05"
+USD_TO_CNY_RATE="7.2"
 ```
 
 真实 key 只放本地 `.env`，不要提交到 GitHub。
@@ -68,6 +70,10 @@ npm run check:heygen
 ```
 
 脚本会请求 HeyGen 的 avatars / voices 列表并打印可复制的 ID，不会打印 API Key。拿到 ID 后可以填到 `.env` 的 `HEYGEN_DEFAULT_AVATAR_ID` / `HEYGEN_DEFAULT_VOICE_ID`，也可以在「数字人形象」和「声音库」里分别填写 `providerAvatarId` / `providerVoiceId`。
+
+也可以在页面的「数字人形象与声音库」点击「同步 HeyGen 资源」，系统会把 HeyGen 账号里的 Avatar 和 Voice 同步到本地 SQLite，后续可直接在工作台选择。
+
+生成前页面会弹出 HeyGen 确认框，显示预计时长、预计费用、当前 Avatar/Voice、分辨率和画幅。费用只是按 `.env` 中的 `HEYGEN_PRICE_USD_PER_SECOND` 与 `USD_TO_CNY_RATE` 做的生成前估算，实际扣费以 HeyGen 后台为准。
 
 生成链路：
 

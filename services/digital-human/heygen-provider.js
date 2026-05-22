@@ -117,6 +117,28 @@ export class HeyGenProvider extends DigitalHumanProvider {
     return `/uploads/projects/${jobId}.mp4`;
   }
 
+  async listAvatars() {
+    const response = await this.request('/v3/avatars');
+    return extractItems(response, 'avatars')
+      .map((item) => normalizeAvatarResource(item))
+      .filter((item) => item.providerAvatarId);
+  }
+
+  async listVoices() {
+    const response = await this.request('/v3/voices');
+    return extractItems(response, 'voices')
+      .map((item) => normalizeVoiceResource(item))
+      .filter((item) => item.providerVoiceId);
+  }
+
+  async listResources() {
+    const [avatars, voices] = await Promise.all([
+      this.listAvatars(),
+      this.listVoices(),
+    ]);
+    return { avatars, voices };
+  }
+
   async request(endpoint, { method = 'GET', json } = {}) {
     const apiKey = process.env.HEYGEN_API_KEY;
     if (!apiKey) {
@@ -140,6 +162,114 @@ export class HeyGenProvider extends DigitalHumanProvider {
     }
     return data;
   }
+}
+
+function extractItems(payload, type) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.data?.[type])) return payload.data[type];
+  if (Array.isArray(payload?.[type])) return payload[type];
+  return [];
+}
+
+function normalizeAvatarResource(item) {
+  const providerAvatarId = directValue(item, ['avatar_id', 'avatarId', 'id']);
+  const name = directValue(item, ['name', 'avatar_name', 'avatarName']) || `HeyGen Avatar ${String(providerAvatarId).slice(0, 8)}`;
+  const previewImage = findUrl(item, [
+    'preview_image_url',
+    'previewImageUrl',
+    'image_url',
+    'imageUrl',
+    'thumbnail_url',
+    'thumbnailUrl',
+    'preview_url',
+    'previewUrl',
+    'photo_url',
+    'photoUrl',
+  ]);
+
+  return {
+    providerAvatarId: String(providerAvatarId || '').trim(),
+    name: String(name || 'HeyGen Avatar').trim(),
+    gender: normalizeGender(directValue(item, ['gender'])),
+    style: directValue(item, ['style', 'type', 'category']) || 'HeyGen 数字人',
+    previewImage,
+    sourceImage: previewImage,
+    status: normalizeResourceStatus(directValue(item, ['status', 'state']) || 'active'),
+    raw: item,
+  };
+}
+
+function normalizeVoiceResource(item) {
+  const providerVoiceId = directValue(item, ['voice_id', 'voiceId', 'id']);
+  const name = directValue(item, ['name', 'voice_name', 'voiceName']) || `HeyGen Voice ${String(providerVoiceId).slice(0, 8)}`;
+  const sampleUrl = findUrl(item, [
+    'preview_audio',
+    'previewAudio',
+    'preview_audio_url',
+    'previewAudioUrl',
+    'sample_url',
+    'sampleUrl',
+    'audio_url',
+    'audioUrl',
+    'url',
+  ]);
+
+  return {
+    providerVoiceId: String(providerVoiceId || '').trim(),
+    name: String(name || 'HeyGen Voice').trim(),
+    gender: normalizeGender(directValue(item, ['gender'])),
+    language: directValue(item, ['language', 'locale', 'lang']) || 'Unknown',
+    style: directValue(item, ['style', 'type', 'category']) || 'HeyGen 声音',
+    sampleUrl,
+    duration: durationToText(directValue(item, ['duration', 'duration_seconds', 'durationSeconds'])) || '00:15',
+    status: normalizeResourceStatus(directValue(item, ['status', 'state']) || 'ready'),
+    raw: item,
+  };
+}
+
+function directValue(item, keys) {
+  if (!item || typeof item !== 'object') return '';
+  for (const key of keys) {
+    if (item[key] !== undefined && item[key] !== null && item[key] !== '') return item[key];
+  }
+  return '';
+}
+
+function findUrl(value, keys) {
+  const direct = findValue(value, keys);
+  if (typeof direct === 'string' && isUsableUrl(direct)) return direct;
+
+  const queue = [value];
+  const seen = new Set();
+  while (queue.length) {
+    const current = queue.shift();
+    if (!current || seen.has(current)) continue;
+    seen.add(current);
+    if (typeof current === 'string' && isUsableUrl(current)) return current;
+    if (typeof current !== 'object') continue;
+    for (const next of Object.values(current)) queue.push(next);
+  }
+  return '';
+}
+
+function isUsableUrl(value) {
+  return /^https?:\/\//i.test(value) || String(value || '').startsWith('/uploads/');
+}
+
+function normalizeGender(value) {
+  const gender = String(value || '').toLowerCase();
+  if (['female', 'woman', 'girl', 'f', '女性'].includes(gender)) return '女性';
+  if (['male', 'man', 'boy', 'm', '男性'].includes(gender)) return '男性';
+  return value ? String(value) : '中性';
+}
+
+function normalizeResourceStatus(value) {
+  const status = String(value || '').toLowerCase();
+  if (['active', 'ready', 'success', 'completed', 'available'].includes(status)) return 'ready';
+  if (['failed', 'error', 'disabled'].includes(status)) return 'failed';
+  if (['pending', 'processing', 'training'].includes(status)) return 'pending';
+  return 'ready';
 }
 
 function findValue(value, keys) {

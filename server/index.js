@@ -215,10 +215,68 @@ async function setDefault(model, id, userId) {
   return delegate.update({ where: { id }, data: { isDefault: true } });
 }
 
-app.get('/api/health', (req, res) => {
+function placeholderImage(name) {
+  return `https://placehold.co/720x1280/eef2ff/2563eb?text=${encodeURIComponent(String(name || 'HeyGen').slice(0, 16))}`;
+}
+
+function numberEnv(key, fallback) {
+  const value = Number(process.env[key]);
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function buildCostConfig() {
   const videoMode = aliyunVideoMode();
   const videoResolution = process.env.ALIYUN_VIDEO_RESOLUTION || '480P';
   const defaultVideoPrice = videoResolution.toUpperCase() === '720P' ? 0.9 : 0.5;
+
+  if (providerName === 'heygen') {
+    const usdToCny = numberEnv('USD_TO_CNY_RATE', 7.2);
+    const usdPerSecond = numberEnv('HEYGEN_PRICE_USD_PER_SECOND', 0.05);
+    return {
+      enabled: true,
+      currency: 'CNY',
+      originalCurrency: 'USD',
+      videoModel: 'HeyGen Avatar API',
+      videoResolution: `${process.env.HEYGEN_DEFAULT_RESOLUTION || '1080p'} ${process.env.HEYGEN_DEFAULT_ASPECT_RATIO || '9:16'}`,
+      videoUnitPricePerSecond: Number((usdPerSecond * usdToCny).toFixed(4)),
+      detectUnitPricePerImage: 0,
+      ttsModel: 'HeyGen Voice',
+      ttsUnitPricePer10kCharacters: 0,
+      note: `HeyGen 费用为生成前预估，按 ${usdPerSecond} USD/s、汇率 ${usdToCny} 估算；实际以 HeyGen 后台扣费为准。`,
+    };
+  }
+
+  if (providerName === 'aliyun') {
+    return {
+      enabled: true,
+      currency: 'CNY',
+      videoModel: videoMode === 'videoretalk' ? (process.env.ALIYUN_VIDEORETALK_MODEL || 'videoretalk') : (process.env.ALIYUN_VIDEO_MODEL || 'wan2.2-s2v'),
+      videoResolution,
+      videoUnitPricePerSecond: Number(videoMode === 'videoretalk'
+        ? (process.env.ALIYUN_VIDEORETALK_PRICE_CNY_PER_SECOND || 0.08)
+        : (process.env.ALIYUN_VIDEO_PRICE_CNY_PER_SECOND || defaultVideoPrice)),
+      detectUnitPricePerImage: Number(videoMode === 'videoretalk' ? 0 : (process.env.ALIYUN_DETECT_PRICE_CNY_PER_IMAGE || 0.004)),
+      ttsModel: process.env.ALIYUN_TTS_MODEL || 'qwen3-tts-flash',
+      ttsUnitPricePer10kCharacters: Number(process.env.ALIYUN_TTS_PRICE_CNY_PER_10K_CHARS || 0.8),
+      note: '仅为生成前预估，实际费用以阿里云账单和最终视频时长为准，未扣除免费额度。',
+    };
+  }
+
+  return {
+    enabled: false,
+    currency: 'CNY',
+    videoModel: providerName,
+    videoResolution: '',
+    videoUnitPricePerSecond: 0,
+    detectUnitPricePerImage: 0,
+    ttsModel: providerName,
+    ttsUnitPricePer10kCharacters: 0,
+    note: '当前模式不会调用付费生成接口。',
+  };
+}
+
+app.get('/api/health', (req, res) => {
+  const videoMode = aliyunVideoMode();
   res.json({
     ok: true,
     provider: providerName,
@@ -238,19 +296,7 @@ app.get('/api/health', (req, res) => {
       resolution: process.env.HEYGEN_DEFAULT_RESOLUTION || '1080p',
       aspectRatio: process.env.HEYGEN_DEFAULT_ASPECT_RATIO || '9:16',
     },
-    cost: {
-      enabled: providerName === 'aliyun',
-      currency: 'CNY',
-      videoModel: videoMode === 'videoretalk' ? (process.env.ALIYUN_VIDEORETALK_MODEL || 'videoretalk') : (process.env.ALIYUN_VIDEO_MODEL || 'wan2.2-s2v'),
-      videoResolution,
-      videoUnitPricePerSecond: Number(videoMode === 'videoretalk'
-        ? (process.env.ALIYUN_VIDEORETALK_PRICE_CNY_PER_SECOND || 0.08)
-        : (process.env.ALIYUN_VIDEO_PRICE_CNY_PER_SECOND || defaultVideoPrice)),
-      detectUnitPricePerImage: Number(videoMode === 'videoretalk' ? 0 : (process.env.ALIYUN_DETECT_PRICE_CNY_PER_IMAGE || 0.004)),
-      ttsModel: process.env.ALIYUN_TTS_MODEL || 'qwen3-tts-flash',
-      ttsUnitPricePer10kCharacters: Number(process.env.ALIYUN_TTS_PRICE_CNY_PER_10K_CHARS || 0.8),
-      note: '仅为生成前预估，实际费用以阿里云账单和最终视频时长为准，未扣除免费额度。',
-    },
+    cost: buildCostConfig(),
   });
 });
 
@@ -457,6 +503,97 @@ app.post('/api/voices/:id/default', asyncHandler(async (req, res) => {
   const voice = await setDefault('voice', req.params.id, userId);
   if (!voice) return res.status(404).json({ error: '声音不存在' });
   res.json(voice);
+}));
+
+app.post('/api/heygen/sync', asyncHandler(async (req, res) => {
+  const userId = await currentUserId(req);
+  if (!process.env.HEYGEN_API_KEY) {
+    return res.status(400).json({ error: '请先配置 HEYGEN_API_KEY。' });
+  }
+  if (typeof provider.listResources !== 'function') {
+    return res.status(400).json({ error: '当前 provider 不是 HeyGen，请先设置 DIGITAL_HUMAN_PROVIDER=heygen 后重启服务。' });
+  }
+
+  const resources = await provider.listResources();
+  let avatarsImported = 0;
+  let voicesImported = 0;
+
+  const hasDefaultAvatar = await prisma.avatar.count({ where: { userId, isDefault: true, NOT: { status: 'deleted' } } });
+  const hasDefaultVoice = await prisma.voice.count({ where: { userId, isDefault: true, NOT: { status: 'deleted' } } });
+  let assignedDefaultAvatar = Boolean(hasDefaultAvatar);
+  let assignedDefaultVoice = Boolean(hasDefaultVoice);
+
+  for (const resource of resources.avatars || []) {
+    if (!resource.providerAvatarId) continue;
+    const previewImage = resource.previewImage || placeholderImage(resource.name);
+    const data = {
+      name: resource.name || 'HeyGen Avatar',
+      gender: resource.gender || '中性',
+      style: resource.style || 'HeyGen 数字人',
+      previewImage,
+      sourceImage: resource.sourceImage || previewImage,
+      provider: 'heygen',
+      providerAvatarId: resource.providerAvatarId,
+      status: resource.status === 'failed' ? 'failed' : 'active',
+    };
+    const existing = await prisma.avatar.findFirst({
+      where: { userId, provider: 'heygen', providerAvatarId: resource.providerAvatarId },
+    });
+    if (existing) {
+      await prisma.avatar.update({ where: { id: existing.id }, data });
+    } else {
+      await prisma.avatar.create({
+        data: {
+          userId,
+          ...data,
+          isDefault: !assignedDefaultAvatar,
+        },
+      });
+      assignedDefaultAvatar = true;
+    }
+    avatarsImported += 1;
+  }
+
+  for (const resource of resources.voices || []) {
+    if (!resource.providerVoiceId) continue;
+    const data = {
+      name: resource.name || 'HeyGen Voice',
+      gender: resource.gender || '中性',
+      language: resource.language || 'Unknown',
+      style: resource.style || 'HeyGen 声音',
+      sampleUrl: resource.sampleUrl || '',
+      duration: resource.duration || '00:15',
+      provider: 'heygen',
+      providerVoiceId: resource.providerVoiceId,
+      providerStatus: resource.status || 'ready',
+      providerPayload: JSON.stringify(resource.raw || {}),
+      providerError: null,
+      status: resource.status === 'failed' ? 'failed' : 'ready',
+    };
+    const existing = await prisma.voice.findFirst({
+      where: { userId, provider: 'heygen', providerVoiceId: resource.providerVoiceId },
+    });
+    if (existing) {
+      await prisma.voice.update({ where: { id: existing.id }, data });
+    } else {
+      await prisma.voice.create({
+        data: {
+          userId,
+          ...data,
+          isDefault: !assignedDefaultVoice,
+        },
+      });
+      assignedDefaultVoice = true;
+    }
+    voicesImported += 1;
+  }
+
+  const [avatars, voices] = await Promise.all([
+    prisma.avatar.findMany({ where: { userId, provider: 'heygen', NOT: { status: 'deleted' } }, orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }] }),
+    prisma.voice.findMany({ where: { userId, provider: 'heygen', NOT: { status: 'deleted' } }, orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }] }),
+  ]);
+
+  res.json({ avatarsImported, voicesImported, avatars, voices });
 }));
 
 app.get('/api/templates', asyncHandler(async (req, res) => {

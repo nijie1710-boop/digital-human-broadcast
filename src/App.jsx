@@ -213,6 +213,7 @@ function App() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
+  const [confirmGeneration, setConfirmGeneration] = useState(null);
 
   async function refreshAll({ silent = false } = {}) {
     if (!silent) setLoading(true);
@@ -302,42 +303,44 @@ function App() {
     }
   }
 
-  async function handleGenerate() {
-    const text = script.trim();
+  function validateGeneration(text) {
     if (!text) {
       setToast('请输入视频文案');
-      return;
+      return false;
     }
     if (text.length > currentScriptLimit) {
       setToast(currentScriptLimitMessage);
-      return;
+      return false;
     }
     if (!selectedAvatarId) {
       setToast('请选择数字人');
-      return;
+      return false;
     }
     if (!selectedVoiceId) {
       setToast('请选择声音');
-      return;
+      return false;
     }
     if (selectedVoice?.status !== 'ready') {
       setToast('当前声音还在克隆处理中，请稍后再试');
-      return;
+      return false;
     }
     if (systemConfig.provider === 'aliyun' && !systemConfig.aliyun?.configured) {
       setToast('未配置阿里 API Key，请设置 ALIYUN_DASHSCOPE_API_KEY');
-      return;
+      return false;
     }
     if (systemConfig.provider === 'heygen' && !systemConfig.heygen?.configured) {
       setToast('请先配置 HEYGEN_API_KEY。');
-      return;
+      return false;
     }
     if (systemConfig.provider === 'aliyun' && systemConfig.aliyun?.videoMode === 'videoretalk' && !selectedAvatar?.sourceVideo) {
       setToast('VideoRetalk 模式需要先给数字人上传基础视频');
       setActiveView('avatars');
-      return;
+      return false;
     }
+    return true;
+  }
 
+  async function createGenerationJob(text) {
     setBusy('generate');
     try {
       const job = await apiFetch('/api/jobs', {
@@ -361,6 +364,27 @@ function App() {
     } finally {
       setBusy('');
     }
+  }
+
+  async function handleGenerate() {
+    const text = script.trim();
+    if (!validateGeneration(text)) return;
+
+    if (isHeyGenMode(systemConfig)) {
+      setConfirmGeneration({
+        text,
+        estimate: buildCostEstimate(text, systemConfig),
+      });
+      return;
+    }
+
+    await createGenerationJob(text);
+  }
+
+  async function confirmGenerate() {
+    const text = confirmGeneration?.text || script.trim();
+    setConfirmGeneration(null);
+    await createGenerationJob(text);
   }
 
   function applyTemplate(template) {
@@ -496,6 +520,18 @@ function App() {
         <div className="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-full border border-blue-100 bg-white px-5 py-3 text-sm font-medium text-slate-700 shadow-panel">
           {toast}
         </div>
+      ) : null}
+      {confirmGeneration ? (
+        <GenerationConfirmModal
+          estimate={confirmGeneration.estimate}
+          script={confirmGeneration.text}
+          avatar={selectedAvatar}
+          voice={selectedVoice}
+          systemConfig={systemConfig}
+          busy={busy === 'generate'}
+          onConfirm={confirmGenerate}
+          onClose={() => setConfirmGeneration(null)}
+        />
       ) : null}
     </div>
   );
@@ -996,12 +1032,15 @@ function CostEstimateCard({ estimate }) {
   if (!estimate.enabled) {
     return (
       <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-500">
-        当前为 {estimate.provider} 模式，不会产生阿里云生成费用。
+        当前为 {estimate.provider} 模式，不会调用付费生成接口。
       </div>
     );
   }
 
   const hasScript = estimate.seconds > 0;
+  const costBreakdown = estimate.provider === 'heygen'
+    ? `约 ${estimate.seconds}s · ${estimate.videoModel} ${estimate.videoResolution} 渲染 ${formatMoney(estimate.videoCost)}`
+    : `约 ${estimate.seconds}s · ${estimate.videoModel} ${estimate.videoResolution} 视频 ${formatMoney(estimate.videoCost)} + TTS ${formatMoney(estimate.ttsCost)} + 图片检测 ${formatMoney(estimate.detectCost)}`;
   return (
     <div className="mt-3 rounded-2xl border border-amber-100 bg-amber-50/80 p-3">
       <div className="flex items-start gap-2">
@@ -1015,8 +1054,7 @@ function CostEstimateCard({ estimate }) {
           </div>
           {hasScript ? (
             <div className="mt-1 text-[11px] leading-5 text-amber-800/80">
-              约 {estimate.seconds}s · {estimate.videoModel} {estimate.videoResolution} 视频 {formatMoney(estimate.videoCost)}
-              {' '}+ TTS {formatMoney(estimate.ttsCost)} + 图片检测 {formatMoney(estimate.detectCost)}
+              {costBreakdown}
             </div>
           ) : (
             <div className="mt-1 text-[11px] leading-5 text-amber-800/80">输入文案后按预计视频时长自动估算。</div>
@@ -1024,6 +1062,71 @@ function CostEstimateCard({ estimate }) {
           <div className="mt-1 text-[11px] leading-5 text-amber-700/80">{estimate.note}</div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function GenerationConfirmModal({ estimate, script, avatar, voice, systemConfig, busy, onConfirm, onClose }) {
+  const hasChineseScript = /[\u3400-\u9fff]/.test(script);
+  const likelyEnglishVoice = /english|en[-_]?/i.test(voice?.language || '');
+  const avatarSource = avatar?.providerAvatarId ? '库内 HeyGen Avatar ID' : '环境变量默认 Avatar ID';
+  const voiceSource = voice?.providerVoiceId ? '库内 HeyGen Voice ID' : '环境变量默认 Voice ID';
+
+  return (
+    <Modal title="确认提交 HeyGen 生成" onClose={onClose}>
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
+          <div className="flex items-start gap-3">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-amber-600 shadow-sm">
+              <Calculator className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-black text-amber-950">预计费用 {formatMoney(estimate.total)}</div>
+              <div className="mt-1 text-xs leading-5 text-amber-800">
+                约 {estimate.seconds}s · {estimate.videoModel} · {estimate.videoResolution}。提交后会调用 HeyGen 官方 API，可能产生真实扣费。
+              </div>
+              <div className="mt-1 text-xs leading-5 text-amber-700">{estimate.note}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <InfoTile label="数字人" value={avatar?.name || '未选择'} helper={avatarSource} />
+          <InfoTile label="声音" value={voice?.name || '未选择'} helper={voiceSource} />
+          <InfoTile label="分辨率" value={systemConfig.heygen?.resolution || '1080p'} helper={`画幅 ${systemConfig.heygen?.aspectRatio || '9:16'}`} />
+          <InfoTile label="文案长度" value={`${Array.from(script).length} 字`} helper={`预计 ${estimate.seconds}s`} />
+        </div>
+
+        {hasChineseScript && likelyEnglishVoice ? (
+          <div className="rounded-2xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-800">
+            当前文案是中文，但所选 HeyGen 声音看起来是英文音色。建议同步并选择中文 Voice ID，口播自然度会更好。
+          </div>
+        ) : null}
+
+        <div className="rounded-2xl bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">
+          HeyGen 的真实流程是：选择 Avatar 和 Voice，提交脚本文案，等待云端渲染，完成后下载视频。本系统会把结果保存到本地作品管理。
+        </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <button className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-black text-slate-600" type="button" onClick={onClose} disabled={busy}>
+            取消
+          </button>
+          <button className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-black text-white disabled:opacity-60" type="button" onClick={onConfirm} disabled={busy}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+            确认生成
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function InfoTile({ label, value, helper }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-3">
+      <div className="text-xs font-bold text-slate-400">{label}</div>
+      <div className="mt-1 truncate text-sm font-black text-slate-900">{value}</div>
+      <div className="mt-1 truncate text-xs text-slate-500">{helper}</div>
     </div>
   );
 }
@@ -1092,6 +1195,7 @@ function FileDropzone({ label, accept, helper, file, onFile, onInvalid, previewU
 function LibraryPage({ initialTab, avatars, voices, refreshAll, selectedAvatarId, setSelectedAvatarId, selectedVoiceId, setSelectedVoiceId, setToast, systemConfig }) {
   const [tab, setTab] = useState(initialTab);
   const [query, setQuery] = useState('');
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     setTab(initialTab);
@@ -1100,6 +1204,19 @@ function LibraryPage({ initialTab, avatars, voices, refreshAll, selectedAvatarId
   const filteredAvatars = avatars.filter((avatar) => [avatar.name, avatar.gender, avatar.style].join(' ').includes(query));
   const filteredVoices = voices.filter((voice) => [voice.name, voice.gender, voice.language, voice.style].join(' ').includes(query));
 
+  async function syncHeyGenResources() {
+    setSyncing(true);
+    try {
+      const result = await apiFetch('/api/heygen/sync', { method: 'POST' });
+      setToast(`已同步 HeyGen 资源：${result.avatarsImported} 个数字人，${result.voicesImported} 个声音`);
+      refreshAll({ silent: true });
+    } catch (error) {
+      setToast(error.message);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-panel">
       <div className="mb-4 flex flex-col justify-between gap-3 xl:flex-row xl:items-center">
@@ -1107,6 +1224,12 @@ function LibraryPage({ initialTab, avatars, voices, refreshAll, selectedAvatarId
           <h2 className="text-xl font-black text-slate-950">数字人形象与声音库</h2>
           <p className="mt-1 text-sm text-slate-500">数据来自 SQLite API，支持新增、编辑、删除、默认选择和上传。</p>
         </div>
+        {isHeyGenMode(systemConfig) ? (
+          <button className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-black text-blue-700 disabled:opacity-60" type="button" onClick={syncHeyGenResources} disabled={syncing}>
+            {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            同步 HeyGen 资源
+          </button>
+        ) : null}
       </div>
 
       <div className="mb-4 flex border-b border-slate-200">
@@ -1485,8 +1608,22 @@ function VoiceModal({ modal, onClose, refreshAll, setToast, setSelectedVoiceId, 
   );
 }
 
-function TaskCenterPage({ jobs, refreshAll, setToast }) {
+function TaskCenterPage({ jobs, refreshAll, setToast, systemConfig }) {
   const [detail, setDetail] = useState(null);
+  const flowStages = isHeyGenMode(systemConfig)
+    ? [
+        ['提交 HeyGen', 20, Video],
+        ['云端渲染', 50, Clock3],
+        ['下载视频', 80, Download],
+        ['完成入库', 100, CheckCircle2],
+      ]
+    : [
+        ['TTS 生成', 20, Mic2],
+        ['数字人驱动', 45, UserRound],
+        ['字幕生成', 70, FileText],
+        ['视频合成', 90, Video],
+        ['完成入库', 100, CheckCircle2],
+      ];
   const stats = [
     { label: '全部任务', value: jobs.length, icon: FileText, tone: 'blue', hint: '数据库记录' },
     { label: '进行中', value: jobs.filter((job) => ['pending', 'running'].includes(job.status)).length, icon: Clock3, tone: 'cyan', hint: '轮询刷新' },
@@ -1529,14 +1666,8 @@ function TaskCenterPage({ jobs, refreshAll, setToast }) {
 
       <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-panel">
         <h3 className="mb-4 font-black text-slate-950">任务流程</h3>
-        <div className="grid gap-3 md:grid-cols-5">
-          {[
-            ['TTS 生成', 20, Mic2],
-            ['数字人驱动', 45, UserRound],
-            ['字幕生成', 70, FileText],
-            ['视频合成', 90, Video],
-            ['完成入库', 100, CheckCircle2],
-          ].map(([label, value, Icon]) => (
+        <div className={`grid gap-3 ${isHeyGenMode(systemConfig) ? 'md:grid-cols-4' : 'md:grid-cols-5'}`}>
+          {flowStages.map(([label, value, Icon]) => (
             <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4">
               <div className="flex items-center justify-between">
                 <div className="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-blue-600"><Icon className="h-5 w-5" /></div>
