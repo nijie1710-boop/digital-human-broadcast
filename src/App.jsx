@@ -55,7 +55,7 @@ const defaultScript =
   '大家好，欢迎来到我们的品牌直播间！今天为大家带来一款高性价比的智能耳机，它拥有超长续航、高清音质和舒适佩戴体验，无论通勤、运动还是办公，都能带给你沉浸式的使用感受。现在下单，享受限时优惠，数量有限，先到先得！';
 
 const subtitleOptions = ['关键词高亮', '清爽白字', '重点描边', '商务蓝', '新闻下三分之一'];
-const backgroundOptions = ['简约直播间', '书房背景', '企业展厅', '课堂背景', '新闻演播厅', '纯色背景'];
+const backgroundOptions = ['简约直播间', '书房背景', '企业展厅', '课堂背景', '新闻演播厅', '纯色背景', '自定义背景'];
 const introOutroOptions = ['无片头片尾', '品牌片头 + 福利片尾', '标题片头 + 总结片尾', 'Logo 片头 + 联系方式片尾', '课程标题片头 + 报名片尾'];
 const templateCategories = ['全部', '电商口播', '知识讲解', '企业宣传', '课程讲解', '新闻播报'];
 
@@ -230,6 +230,7 @@ function App() {
   const [selectedVoiceId, setSelectedVoiceId] = useState('');
   const [subtitleStyle, setSubtitleStyle] = useState('关键词高亮');
   const [backgroundConfig, setBackgroundConfig] = useState('简约直播间');
+  const [backgroundImageUrl, setBackgroundImageUrl] = useState('');
   const [introOutroConfig, setIntroOutroConfig] = useState('品牌片头 + 福利片尾');
   const [toast, setToast] = useState('');
   const [error, setError] = useState('');
@@ -378,6 +379,7 @@ function App() {
           voiceId: selectedVoiceId,
           subtitleStyle: isHeyGenMode(systemConfig) ? '暂未启用字幕样式' : subtitleStyle,
           backgroundConfig,
+          backgroundImageUrl,
           introOutroConfig: isHeyGenMode(systemConfig) ? '无片头片尾' : introOutroConfig,
         }),
       });
@@ -428,6 +430,7 @@ function App() {
     setSelectedVoiceId(project.voiceId);
     setSubtitleStyle(project.job?.subtitleStyle || '关键词高亮');
     setBackgroundConfig(project.job?.backgroundConfig || '简约直播间');
+    setBackgroundImageUrl(project.job?.backgroundImageUrl || '');
     setIntroOutroConfig(project.job?.introOutroConfig || '品牌片头 + 福利片尾');
     setActiveView('create');
     setToast(`已复用作品「${project.title}」配置`);
@@ -463,6 +466,8 @@ function App() {
           setSubtitleStyle={setSubtitleStyle}
           backgroundConfig={backgroundConfig}
           setBackgroundConfig={setBackgroundConfig}
+          backgroundImageUrl={backgroundImageUrl}
+          setBackgroundImageUrl={setBackgroundImageUrl}
           introOutroConfig={introOutroConfig}
           setIntroOutroConfig={setIntroOutroConfig}
           busy={busy}
@@ -509,6 +514,7 @@ function App() {
     activeView,
     avatars,
     backgroundConfig,
+    backgroundImageUrl,
     busy,
     introOutroConfig,
     jobs,
@@ -670,6 +676,8 @@ function CreateVideoPage({
   setSubtitleStyle,
   backgroundConfig,
   setBackgroundConfig,
+  backgroundImageUrl,
+  setBackgroundImageUrl,
   introOutroConfig,
   setIntroOutroConfig,
   busy,
@@ -770,6 +778,8 @@ function CreateVideoPage({
             setSubtitleStyle={setSubtitleStyle}
             backgroundConfig={backgroundConfig}
             setBackgroundConfig={setBackgroundConfig}
+            backgroundImageUrl={backgroundImageUrl}
+            setBackgroundImageUrl={setBackgroundImageUrl}
             introOutroConfig={introOutroConfig}
             setIntroOutroConfig={setIntroOutroConfig}
             handleGenerate={handleGenerate}
@@ -946,6 +956,8 @@ function SettingsPanel({
   setSubtitleStyle,
   backgroundConfig,
   setBackgroundConfig,
+  backgroundImageUrl,
+  setBackgroundImageUrl,
   introOutroConfig,
   setIntroOutroConfig,
   handleGenerate,
@@ -958,6 +970,25 @@ function SettingsPanel({
   const videoRetalk = isVideoRetalkMode(systemConfig);
   const heygen = isHeyGenMode(systemConfig);
   const heygenImage = isHeyGenImageAvatar(systemConfig, selectedAvatar);
+  const backgroundInputRef = useRef(null);
+
+  async function uploadBackground(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const form = new FormData();
+    form.append('background', file);
+    try {
+      const result = await apiFetch('/api/uploads/background', { method: 'POST', body: form });
+      setBackgroundImageUrl(result.url);
+      setBackgroundConfig('自定义背景');
+      setToast('自定义背景已上传，生成时会传给 HeyGen');
+    } catch (error) {
+      setToast(error.message);
+    } finally {
+      event.target.value = '';
+    }
+  }
+
   return (
     <div className="space-y-3">
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -1052,10 +1083,42 @@ function SettingsPanel({
           disabled={heygen}
           helper={heygen ? '当前不会传入字幕样式；后续需要用 FFmpeg 后处理统一烧录字幕。' : ''}
         />
-        <SelectInput label="背景设置" value={backgroundConfig} options={backgroundOptions} onChange={setBackgroundConfig} />
+        <SelectInput label="背景设置" value={backgroundConfig} options={backgroundOptions} onChange={(value) => {
+          setBackgroundConfig(value);
+          if (value !== '自定义背景') setBackgroundImageUrl('');
+        }} />
+        {heygen ? (
+          <div className="mb-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-3">
+            <input ref={backgroundInputRef} className="hidden" type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" onChange={uploadBackground} />
+            <div className="flex items-center gap-3">
+              {backgroundImageUrl ? (
+                <img className="h-16 w-11 rounded-xl object-cover" src={backgroundImageUrl} alt="自定义背景" />
+              ) : (
+                <div className="grid h-16 w-11 place-items-center rounded-xl bg-white text-slate-400">
+                  <Upload className="h-4 w-4" />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-black text-slate-700">自定义背景图</div>
+                <div className="mt-1 truncate text-xs text-slate-400">{backgroundImageUrl || '可上传 jpg/png/webp，建议 1080x1920 竖图。'}</div>
+              </div>
+              <button className="rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-700" type="button" onClick={() => backgroundInputRef.current?.click()}>
+                上传
+              </button>
+              {backgroundImageUrl ? (
+                <button className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-500" type="button" onClick={() => {
+                  setBackgroundImageUrl('');
+                  setBackgroundConfig('简约直播间');
+                }}>
+                  移除
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
         {heygen ? (
           <div className="mb-3 rounded-xl bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-800">
-            背景设置会实际传给 HeyGen。系统会传入场景背景图并尝试抠除原背景；如果该 Avatar 不支持抠像，任务会返回失败原因。
+            背景设置会实际传给 HeyGen。上传自定义背景后会优先使用你的背景图，并尝试抠除原背景；如果该 Avatar 不支持抠像，任务会返回失败原因。
           </div>
         ) : null}
         <SelectInput
@@ -2228,6 +2291,7 @@ function JobDetailModal({ job, onClose }) {
         <InfoRow label="声音" value={job.voice?.name || '-'} />
         <InfoRow label="字幕样式" value={job.subtitleStyle} />
         <InfoRow label="背景设置" value={job.backgroundConfig} />
+        {job.backgroundImageUrl ? <InfoRow label="自定义背景" value={job.backgroundImageUrl} /> : null}
         <InfoRow label="片头片尾" value={job.introOutroConfig} />
         {job.errorMessage ? (
           <div className="rounded-xl border border-rose-100 bg-rose-50 p-3 text-rose-700">

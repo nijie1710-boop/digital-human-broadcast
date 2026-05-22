@@ -74,7 +74,7 @@ export class HeyGenProvider extends DigitalHumanProvider {
     const caption = buildCaptionSetting(job.subtitleStyle);
     if (caption) basePayload.caption = caption;
 
-    const background = buildBackgroundSetting(job.backgroundConfig);
+    const background = buildBackgroundSetting(job.backgroundConfig, job.backgroundImageUrl);
     if (background) {
       basePayload.background = background;
       basePayload.remove_background = process.env.HEYGEN_REMOVE_BACKGROUND === 'false' ? false : true;
@@ -250,7 +250,8 @@ export class HeyGenProvider extends DigitalHumanProvider {
   }
 }
 
-function buildBackgroundSetting(backgroundConfig) {
+function buildBackgroundSetting(backgroundConfig, backgroundImageUrl = '') {
+  if (backgroundImageUrl) return { type: 'image', url: toPublicUrl(backgroundImageUrl) };
   const value = String(backgroundConfig || '').trim();
   const imageUrl = backgroundImageUrl(value);
   if (imageUrl) return { type: 'image', url: toPublicUrl(imageUrl) };

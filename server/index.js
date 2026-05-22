@@ -46,6 +46,12 @@ const uploadRules = {
     mimes: ['video/mp4', 'video/webm'],
     message: '数字人基础视频只允许上传 mp4/webm 文件',
   },
+  background: {
+    folder: 'backgrounds',
+    extensions: ['.jpg', '.jpeg', '.png', '.webp'],
+    mimes: ['image/jpeg', 'image/png', 'image/webp'],
+    message: '背景图只允许上传 jpg/png/webp 文件',
+  },
   sample: {
     folder: 'voices',
     extensions: ['.wav', '.mp3', '.m4a'],
@@ -110,7 +116,7 @@ function loadDotEnv() {
 }
 
 function ensureLocalFiles() {
-  for (const dir of ['public/uploads/avatars', 'public/uploads/avatar-videos', 'public/uploads/voices', 'public/uploads/projects', 'public/uploads/cache', 'public/samples', 'prisma']) {
+  for (const dir of ['public/uploads/avatars', 'public/uploads/avatar-videos', 'public/uploads/backgrounds', 'public/uploads/voices', 'public/uploads/projects', 'public/uploads/cache', 'public/samples', 'prisma']) {
     fs.mkdirSync(path.join(rootDir, dir), { recursive: true });
   }
   const dbPath = path.join(rootDir, 'prisma/dev.db');
@@ -395,6 +401,13 @@ app.get('/api/avatars', asyncHandler(async (req, res) => {
     orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
   });
   res.json(avatars);
+}));
+
+app.post('/api/uploads/background', upload.single('background'), asyncHandler(async (req, res) => {
+  await currentUserId(req);
+  const url = fileUrl(req.file);
+  if (!url) return res.status(400).json({ error: '请上传背景图' });
+  res.status(201).json({ url });
 }));
 
 app.post('/api/avatars', upload.fields([{ name: 'image', maxCount: 1 }, { name: 'sourceVideo', maxCount: 1 }]), asyncHandler(async (req, res) => {
@@ -809,6 +822,7 @@ app.post('/api/jobs', asyncHandler(async (req, res) => {
     voiceId: voice.id,
     subtitleStyle: req.body.subtitleStyle || '关键词高亮',
     backgroundConfig: req.body.backgroundConfig || '简约直播间',
+    backgroundImageUrl: req.body.backgroundImageUrl || null,
     introOutroConfig: req.body.introOutroConfig || '无片头片尾',
   });
   res.status(201).json(job);

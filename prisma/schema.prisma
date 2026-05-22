@@ -95,6 +95,7 @@ model GenerationJob {
   voiceId          String
   subtitleStyle    String
   backgroundConfig String
+  backgroundImageUrl String?
   introOutroConfig String
   provider         String    @default("mock")
   providerTaskId   String?
