@@ -351,6 +351,7 @@ app.get('/api/health', (req, res) => {
     heygen: {
       configured: Boolean(process.env.HEYGEN_API_KEY),
       apiBase: process.env.HEYGEN_API_BASE || 'https://api.heygen.com',
+      publicBaseUrlConfigured: Boolean(process.env.PUBLIC_BASE_URL),
       defaultAvatarConfigured: Boolean(process.env.HEYGEN_DEFAULT_AVATAR_ID),
       defaultVoiceConfigured: Boolean(process.env.HEYGEN_DEFAULT_VOICE_ID),
       resolution: process.env.HEYGEN_DEFAULT_RESOLUTION || '1080p',
@@ -745,8 +746,8 @@ app.post('/api/jobs', asyncHandler(async (req, res) => {
   if (providerName === 'aliyun' && aliyunVideoMode() === 'videoretalk' && !avatar.sourceVideo) {
     return res.status(400).json({ error: 'VideoRetalk 模式需要先给数字人上传基础视频' });
   }
-  if (providerName === 'heygen' && !avatar.providerAvatarId && !process.env.HEYGEN_DEFAULT_AVATAR_ID) {
-    return res.status(400).json({ error: 'HeyGen 生成需要给数字人填写 providerAvatarId，或配置 HEYGEN_DEFAULT_AVATAR_ID' });
+  if (providerName === 'heygen' && !avatar.providerAvatarId && !(avatar.sourceImage || avatar.previewImage)) {
+    return res.status(400).json({ error: 'HeyGen 生成需要 HeyGen Avatar ID，或给数字人上传可公网访问的形象图。' });
   }
   if (providerName === 'heygen' && !voice.providerVoiceId && !process.env.HEYGEN_DEFAULT_VOICE_ID) {
     return res.status(400).json({ error: 'HeyGen 生成需要给声音填写 providerVoiceId，或配置 HEYGEN_DEFAULT_VOICE_ID' });

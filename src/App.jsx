@@ -175,6 +175,10 @@ function isHeyGenMode(systemConfig) {
   return systemConfig.provider === 'heygen';
 }
 
+function isHeyGenImageAvatar(systemConfig, avatar) {
+  return isHeyGenMode(systemConfig) && Boolean(avatar) && !avatar.providerAvatarId;
+}
+
 function providerDisplayName(systemConfig) {
   if (isHeyGenMode(systemConfig)) return 'HeyGen 高质量数字人';
   if (isVideoRetalkMode(systemConfig)) return '阿里 VideoRetalk 口型替换';
@@ -330,6 +334,10 @@ function App() {
     }
     if (systemConfig.provider === 'heygen' && !systemConfig.heygen?.configured) {
       setToast('请先配置 HEYGEN_API_KEY。');
+      return false;
+    }
+    if (isHeyGenImageAvatar(systemConfig, selectedAvatar) && !systemConfig.heygen?.publicBaseUrlConfigured) {
+      setToast('本地图片驱动 HeyGen 需要 PUBLIC_BASE_URL 公网地址，请使用 Cloudflare Tunnel/ngrok 或部署到服务器。');
       return false;
     }
     if (systemConfig.provider === 'aliyun' && systemConfig.aliyun?.videoMode === 'videoretalk' && !selectedAvatar?.sourceVideo) {
@@ -528,6 +536,7 @@ function App() {
           avatar={selectedAvatar}
           voice={selectedVoice}
           systemConfig={systemConfig}
+          backgroundConfig={backgroundConfig}
           busy={busy === 'generate'}
           onConfirm={confirmGenerate}
           onClose={() => setConfirmGeneration(null)}
@@ -804,6 +813,7 @@ function ScriptPanel({ script, setScript, handleRewrite, pasteFromClipboard, bus
 function GenerationReadiness({ script, selectedAvatar, selectedVoice, systemConfig, scriptLimit, setActiveView, setToast }) {
   const videoRetalk = isVideoRetalkMode(systemConfig);
   const heygen = isHeyGenMode(systemConfig);
+  const heygenImage = isHeyGenImageAvatar(systemConfig, selectedAvatar);
   const scriptReady = Boolean(script.trim()) && script.length <= scriptLimit;
   const avatarReady = Boolean(selectedAvatar) && (!videoRetalk || Boolean(selectedAvatar.sourceVideo));
   const voiceReady = Boolean(selectedVoice) && selectedVoice.status === 'ready';
@@ -834,7 +844,7 @@ function GenerationReadiness({ script, selectedAvatar, selectedVoice, systemConf
         <div>
           <div className="text-sm font-black text-slate-900">生成准备</div>
           <div className="mt-0.5 text-xs text-slate-500">
-            当前引擎：{providerDisplayName(systemConfig)}。{videoRetalk ? 'VideoRetalk 模式需要基础视频，生成后会自动进入任务中心。' : '素材准备完成后即可创建生成任务。'}
+            当前引擎：{providerDisplayName(systemConfig)}。{videoRetalk ? 'VideoRetalk 模式需要基础视频，生成后会自动进入任务中心。' : heygenImage ? '当前数字人没有 HeyGen ID，将使用上传图片做 HeyGen 图片驱动。' : '素材准备完成后即可创建生成任务。'}
           </div>
         </div>
         <button className="self-start rounded-lg bg-white px-3 py-1.5 text-xs font-black text-blue-700 shadow-sm sm:self-auto" type="button" onClick={() => setActiveView(videoRetalk && !selectedAvatar?.sourceVideo ? 'avatars' : 'tasks')}>
@@ -928,6 +938,8 @@ function SettingsPanel({
   systemConfig,
 }) {
   const videoRetalk = isVideoRetalkMode(systemConfig);
+  const heygen = isHeyGenMode(systemConfig);
+  const heygenImage = isHeyGenImageAvatar(systemConfig, selectedAvatar);
   return (
     <div className="space-y-3">
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -954,13 +966,19 @@ function SettingsPanel({
                 {selectedAvatar.gender} | {selectedAvatar.style} | {selectedAvatar.status}
               </div>
               {selectedAvatar.sourceVideo ? <div className="mt-0.5 text-xs font-bold text-blue-600">VideoRetalk 基础视频已就绪</div> : null}
-              {selectedAvatar.providerAvatarId ? <div className="mt-0.5 text-xs font-bold text-violet-600">HeyGen Avatar ID 已配置</div> : null}
+              {selectedAvatar.providerAvatarId ? <div className="mt-0.5 text-xs font-bold text-violet-600">HeyGen Avatar ID 已配置，会使用官方数字人</div> : null}
+              {heygenImage ? <div className="mt-0.5 text-xs font-bold text-emerald-600">HeyGen 图片驱动，会让这张形象图动起来</div> : null}
             </div>
           </div>
         ) : null}
         {videoRetalk && selectedAvatar && !selectedAvatar.sourceVideo ? (
           <button className="mt-3 w-full rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-left text-xs font-bold text-amber-700" type="button" onClick={() => setActiveView('avatars')}>
             当前数字人缺少基础视频，上传后才能使用 VideoRetalk 生成。
+          </button>
+        ) : null}
+        {heygenImage ? (
+          <button className="mt-3 w-full rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-left text-xs font-bold text-emerald-700" type="button" onClick={() => setActiveView('avatars')}>
+            当前选择的是本地图片数字人。生成时会调用 HeyGen image-to-video；如需更稳定效果，可在编辑里填 HeyGen Avatar ID。
           </button>
         ) : null}
         <div className="mt-3 grid grid-cols-3 gap-2">
@@ -1010,6 +1028,11 @@ function SettingsPanel({
         <h3 className="mb-3 font-black text-slate-900">视频设置</h3>
         <SelectInput label="字幕样式" value={subtitleStyle} options={subtitleOptions} onChange={setSubtitleStyle} />
         <SelectInput label="背景设置" value={backgroundConfig} options={backgroundOptions} onChange={setBackgroundConfig} />
+        {heygen ? (
+          <div className="mb-3 rounded-xl bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-800">
+            HeyGen 模式会把非「简约直播间」背景传给官方 API，并尝试抠除原背景；如果该 Avatar 不支持抠像，任务会返回失败原因。
+          </div>
+        ) : null}
         <SelectInput label="片头片尾" value={introOutroConfig} options={introOutroOptions} onChange={setIntroOutroConfig} />
         <CostEstimateCard estimate={costEstimate} />
         <button
@@ -1066,10 +1089,10 @@ function CostEstimateCard({ estimate }) {
   );
 }
 
-function GenerationConfirmModal({ estimate, script, avatar, voice, systemConfig, busy, onConfirm, onClose }) {
+function GenerationConfirmModal({ estimate, script, avatar, voice, systemConfig, backgroundConfig, busy, onConfirm, onClose }) {
   const hasChineseScript = /[\u3400-\u9fff]/.test(script);
   const likelyEnglishVoice = /english|en[-_]?/i.test(voice?.language || '');
-  const avatarSource = avatar?.providerAvatarId ? '库内 HeyGen Avatar ID' : '环境变量默认 Avatar ID';
+  const avatarSource = avatar?.providerAvatarId ? '库内 HeyGen Avatar ID' : '上传图片驱动';
   const voiceSource = voice?.providerVoiceId ? '库内 HeyGen Voice ID' : '环境变量默认 Voice ID';
 
   return (
@@ -1095,6 +1118,7 @@ function GenerationConfirmModal({ estimate, script, avatar, voice, systemConfig,
           <InfoTile label="声音" value={voice?.name || '未选择'} helper={voiceSource} />
           <InfoTile label="分辨率" value={systemConfig.heygen?.resolution || '1080p'} helper={`画幅 ${systemConfig.heygen?.aspectRatio || '9:16'}`} />
           <InfoTile label="文案长度" value={`${Array.from(script).length} 字`} helper={`预计 ${estimate.seconds}s`} />
+          <InfoTile label="背景" value={backgroundConfig || '简约直播间'} helper={backgroundConfig === '简约直播间' ? '保持默认背景' : '会传给 HeyGen 背景设置'} />
         </div>
 
         {hasChineseScript && likelyEnglishVoice ? (

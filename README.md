@@ -59,6 +59,12 @@ HEYGEN_DEFAULT_RESOLUTION="1080p"
 HEYGEN_DEFAULT_ASPECT_RATIO="9:16"
 HEYGEN_PRICE_USD_PER_SECOND="0.05"
 USD_TO_CNY_RATE="7.2"
+HEYGEN_AVATAR_FIT="contain"
+HEYGEN_EXPRESSIVENESS="medium"
+HEYGEN_REMOVE_BACKGROUND="true"
+HEYGEN_ENABLE_MOTION_PROMPT="false"
+HEYGEN_MOTION_PROMPT=""
+HEYGEN_BACKGROUND_IMAGE_URL=""
 ```
 
 真实 key 只放本地 `.env`，不要提交到 GitHub。
@@ -72,6 +78,13 @@ npm run check:heygen
 脚本会请求 HeyGen 的 avatars / voices 列表并打印可复制的 ID，不会打印 API Key。拿到 ID 后可以填到 `.env` 的 `HEYGEN_DEFAULT_AVATAR_ID` / `HEYGEN_DEFAULT_VOICE_ID`，也可以在「数字人形象」和「声音库」里分别填写 `providerAvatarId` / `providerVoiceId`。
 
 也可以在页面的「数字人形象与声音库」点击「同步 HeyGen 资源」，系统会把 HeyGen 账号里的 Avatar 和 Voice 同步到本地 SQLite，后续可直接在工作台选择。
+
+数字人生成规则：
+
+- 选择带 `providerAvatarId` 的 HeyGen 数字人时，系统会调用 HeyGen 官方 Avatar。
+- 选择没有 `providerAvatarId` 的本地上传数字人时，系统会走 HeyGen `image-to-video`，用上传的形象图生成口播。此时图片必须通过 `PUBLIC_BASE_URL` 公网可访问。
+- 工作台里的「背景设置」会传给 HeyGen。选择非「简约直播间」背景时，系统会开启 `remove_background` 并传入背景颜色；如果账号或 Avatar 不支持抠像，HeyGen 会返回失败原因。
+- 如果配置了 `HEYGEN_BACKGROUND_IMAGE_URL`，非默认背景会优先使用该公网图片作为背景图。
 
 生成前页面会弹出 HeyGen 确认框，显示预计时长、预计费用、当前 Avatar/Voice、分辨率和画幅。费用只是按 `.env` 中的 `HEYGEN_PRICE_USD_PER_SECOND` 与 `USD_TO_CNY_RATE` 做的生成前估算，实际扣费以 HeyGen 后台为准。
 

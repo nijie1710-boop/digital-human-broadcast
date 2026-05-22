@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { DigitalHumanProvider, estimateDuration } from './provider.js';
+import { toPublicUrl } from './public-url.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -54,25 +55,48 @@ export class HeyGenProvider extends DigitalHumanProvider {
   }
 
   async createVideo(job) {
-    const avatarId = job.avatar?.providerAvatarId || process.env.HEYGEN_DEFAULT_AVATAR_ID;
+    const avatarId = job.avatar?.providerAvatarId || '';
     const voiceId = job.voice?.providerVoiceId || process.env.HEYGEN_DEFAULT_VOICE_ID;
-    if (!avatarId) {
-      throw new Error('HeyGen 生成需要 providerAvatarId，或配置 HEYGEN_DEFAULT_AVATAR_ID');
-    }
     if (!voiceId) {
       throw new Error('HeyGen 生成需要 providerVoiceId，或配置 HEYGEN_DEFAULT_VOICE_ID');
     }
 
-    const payload = {
-      type: 'avatar',
-      avatar_id: avatarId,
+    const basePayload = {
       title: job.title || '数字人口播视频',
       aspect_ratio: process.env.HEYGEN_DEFAULT_ASPECT_RATIO || '9:16',
       resolution: process.env.HEYGEN_DEFAULT_RESOLUTION || '1080p',
       output_format: 'mp4',
       script: job.script,
       voice_id: voiceId,
+      fit: process.env.HEYGEN_AVATAR_FIT || 'contain',
+      caption: buildCaptionSetting(job.subtitleStyle),
+      voice_settings: buildVoiceSettings(job.voice),
     };
+    const background = buildBackgroundSetting(job.backgroundConfig);
+    if (background) {
+      basePayload.background = background;
+      basePayload.remove_background = process.env.HEYGEN_REMOVE_BACKGROUND === 'false' ? false : true;
+    }
+
+    const imageMode = !avatarId;
+    const payload = !imageMode
+      ? {
+          ...basePayload,
+          type: 'avatar',
+          avatar_id: avatarId,
+        }
+      : {
+          ...basePayload,
+          type: 'image',
+          image: {
+            type: 'url',
+            url: toPublicUrl(job.avatar?.sourceImage || job.avatar?.previewImage || job.coverUrl),
+          },
+        };
+    if (imageMode || process.env.HEYGEN_ENABLE_MOTION_PROMPT === 'true') {
+      payload.motion_prompt = buildMotionPrompt(job);
+      payload.expressiveness = process.env.HEYGEN_EXPRESSIVENESS || 'medium';
+    }
 
     const response = await this.request('/v3/videos', {
       method: 'POST',
@@ -162,6 +186,50 @@ export class HeyGenProvider extends DigitalHumanProvider {
     }
     return data;
   }
+}
+
+function buildBackgroundSetting(backgroundConfig) {
+  const value = String(backgroundConfig || '').trim();
+  const imageUrl = process.env.HEYGEN_BACKGROUND_IMAGE_URL;
+  if (imageUrl && value !== '简约直播间') {
+    return { type: 'image', url: toPublicUrl(imageUrl) };
+  }
+
+  const color = {
+    书房背景: '#eadfce',
+    企业展厅: '#eef2f7',
+    课堂背景: '#e8f2ff',
+    新闻演播厅: '#dbeafe',
+    纯色背景: '#f8fafc',
+  }[value];
+
+  return color ? { type: 'color', value: color } : null;
+}
+
+function buildCaptionSetting(subtitleStyle) {
+  const value = String(subtitleStyle || '').trim();
+  if (!value || value === '无字幕') return null;
+  return {
+    file_format: 'srt',
+    style: 'default',
+  };
+}
+
+function buildVoiceSettings(voice) {
+  const language = String(voice?.language || '').toLowerCase();
+  const locale = language.includes('普通话') || language.includes('zh') || language.includes('中文') ? 'zh-CN' : null;
+  return {
+    speed: Number(process.env.HEYGEN_VOICE_SPEED || 1),
+    pitch: Number(process.env.HEYGEN_VOICE_PITCH || 0),
+    volume: Number(process.env.HEYGEN_VOICE_VOLUME || 1),
+    ...(locale ? { locale } : {}),
+  };
+}
+
+function buildMotionPrompt(job) {
+  const style = String(job.avatar?.style || '').trim();
+  const prompt = process.env.HEYGEN_MOTION_PROMPT || `Natural talking-head presenter gestures, steady eye contact, subtle head movement, confident ${style || 'business'} delivery.`;
+  return prompt.slice(0, 500);
 }
 
 function extractItems(payload, type) {
