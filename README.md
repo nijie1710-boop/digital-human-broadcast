@@ -106,7 +106,7 @@ npm run check:heygen
 
 - 选择带 `providerAvatarId` 的 HeyGen 数字人时，系统会调用 HeyGen 官方 Avatar。
 - 选择没有 `providerAvatarId` 的本地上传数字人时，系统会走 HeyGen `image-to-video`，用上传的形象图生成口播。此时图片必须通过 `PUBLIC_BASE_URL` 公网可访问。
-- 工作台里的「背景设置」会传给 HeyGen。系统会开启 `remove_background` 并传入场景背景图；如果账号或 Avatar 不支持抠像，HeyGen 会返回失败原因。
+- 工作台里的「背景设置」会传给 HeyGen。选择「保留原图背景」时不传背景、不启用抠图；选择其他背景时会开启 `remove_background` 并传入场景背景图，如果账号或 Avatar 不支持抠像，HeyGen 会返回失败原因。
 - 工作台支持上传自定义背景图，支持 `jpg/png/webp`，建议使用 1080x1920 竖图。上传后系统会把 `/uploads/backgrounds/...` 转成 `PUBLIC_BASE_URL` 公网 URL 并优先传给 HeyGen。
 - 可以用 `HEYGEN_BACKGROUND_LIVEROOM_URL`、`HEYGEN_BACKGROUND_STUDY_URL` 等变量覆盖每个背景选项。只配置 `HEYGEN_BACKGROUND_IMAGE_URL` 时，所有背景选项都会使用同一张公网背景图。
 - HeyGen 模式下「字幕样式」和「片头片尾」当前不合成到最终视频里。页面会禁用这两项，任务保存为“暂未启用/无片头片尾”。后续要做成品级字幕和片头片尾，建议在 HeyGen 输出后增加本地 FFmpeg 后处理。

@@ -251,6 +251,7 @@ export class HeyGenProvider extends DigitalHumanProvider {
 }
 
 function buildBackgroundSetting(backgroundConfig, backgroundImageUrl = '') {
+  if (String(backgroundConfig || '').trim() === '保留原图背景') return null;
   if (backgroundImageUrl) return { type: 'image', url: toPublicUrl(backgroundImageUrl) };
   const value = String(backgroundConfig || '').trim();
   const imageUrl = backgroundImageUrl(value);

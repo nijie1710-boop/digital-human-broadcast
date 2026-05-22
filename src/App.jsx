@@ -55,7 +55,7 @@ const defaultScript =
   '大家好，欢迎来到我们的品牌直播间！今天为大家带来一款高性价比的智能耳机，它拥有超长续航、高清音质和舒适佩戴体验，无论通勤、运动还是办公，都能带给你沉浸式的使用感受。现在下单，享受限时优惠，数量有限，先到先得！';
 
 const subtitleOptions = ['关键词高亮', '清爽白字', '重点描边', '商务蓝', '新闻下三分之一'];
-const backgroundOptions = ['简约直播间', '书房背景', '企业展厅', '课堂背景', '新闻演播厅', '纯色背景', '自定义背景'];
+const backgroundOptions = ['保留原图背景', '简约直播间', '书房背景', '企业展厅', '课堂背景', '新闻演播厅', '纯色背景', '自定义背景'];
 const introOutroOptions = ['无片头片尾', '品牌片头 + 福利片尾', '标题片头 + 总结片尾', 'Logo 片头 + 联系方式片尾', '课程标题片头 + 报名片尾'];
 const templateCategories = ['全部', '电商口播', '知识讲解', '企业宣传', '课程讲解', '新闻播报'];
 
@@ -1118,7 +1118,7 @@ function SettingsPanel({
         ) : null}
         {heygen ? (
           <div className="mb-3 rounded-xl bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-800">
-            背景设置会实际传给 HeyGen。上传自定义背景后会优先使用你的背景图，并尝试抠除原背景；如果该 Avatar 不支持抠像，任务会返回失败原因。
+            选择「保留原图背景」时不会抠图换背景；其他背景会传给 HeyGen，并尝试抠除原背景。上传自定义背景后会优先使用你的背景图。
           </div>
         ) : null}
         <SelectInput
@@ -1213,7 +1213,11 @@ function GenerationConfirmModal({ estimate, script, avatar, voice, systemConfig,
           <InfoTile label="声音" value={voice?.name || '未选择'} helper={voiceSource} />
           <InfoTile label="分辨率" value={systemConfig.heygen?.resolution || '1080p'} helper={`画幅 ${systemConfig.heygen?.aspectRatio || '9:16'}`} />
           <InfoTile label="文案长度" value={`${Array.from(script).length} 字`} helper={`预计 ${estimate.seconds}s`} />
-          <InfoTile label="背景" value={backgroundConfig || '简约直播间'} helper={backgroundConfig === '简约直播间' ? '保持默认背景' : '会传给 HeyGen 背景设置'} />
+          <InfoTile
+            label="背景"
+            value={backgroundConfig || '简约直播间'}
+            helper={backgroundConfig === '保留原图背景' ? '不抠图换背景' : backgroundConfig === '简约直播间' ? '使用内置场景背景' : '会传给 HeyGen 背景设置'}
+          />
         </div>
 
         {hasChineseScript && likelyEnglishVoice ? (
