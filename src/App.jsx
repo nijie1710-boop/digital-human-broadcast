@@ -236,7 +236,7 @@ function App() {
   const [selectedAvatarId, setSelectedAvatarId] = useState('');
   const [selectedVoiceId, setSelectedVoiceId] = useState('');
   const [subtitleStyle, setSubtitleStyle] = useState('关键词高亮');
-  const [backgroundConfig, setBackgroundConfig] = useState('简约直播间');
+  const [backgroundConfig, setBackgroundConfig] = useState('保留原图背景');
   const [backgroundImageUrl, setBackgroundImageUrl] = useState('');
   const [audioSyncOffsetMs, setAudioSyncOffsetMs] = useState(200);
   const [introOutroConfig, setIntroOutroConfig] = useState('品牌片头 + 福利片尾');
@@ -438,7 +438,7 @@ function App() {
     setSelectedAvatarId(project.avatarId);
     setSelectedVoiceId(project.voiceId);
     setSubtitleStyle(project.job?.subtitleStyle || '关键词高亮');
-    setBackgroundConfig(project.job?.backgroundConfig || '简约直播间');
+    setBackgroundConfig(project.job?.backgroundConfig || '保留原图背景');
     setBackgroundImageUrl(project.job?.backgroundImageUrl || '');
     setAudioSyncOffsetMs(project.job?.audioSyncOffsetMs ?? 200);
     setIntroOutroConfig(project.job?.introOutroConfig || '品牌片头 + 福利片尾');
@@ -574,6 +574,8 @@ function App() {
           voice={selectedVoice}
           systemConfig={systemConfig}
           backgroundConfig={backgroundConfig}
+          backgroundImageUrl={backgroundImageUrl}
+          audioSyncOffsetMs={audioSyncOffsetMs}
           busy={busy === 'generate'}
           onConfirm={confirmGenerate}
           onClose={() => setConfirmGeneration(null)}
@@ -776,6 +778,15 @@ function CreateVideoPage({
           setActiveView={setActiveView}
           setToast={setToast}
         />
+        {isHeyGenMode(systemConfig) ? (
+          <GenerationQualityTips
+            selectedAvatar={selectedAvatar}
+            selectedVoice={selectedVoice}
+            backgroundConfig={backgroundConfig}
+            backgroundImageUrl={backgroundImageUrl}
+            audioSyncOffsetMs={audioSyncOffsetMs}
+          />
+        ) : null}
 
         <div className="grid gap-4 xl:grid-cols-[minmax(320px,1.08fr)_360px_340px]">
           <ScriptPanel script={script} setScript={setScript} handleRewrite={handleRewrite} pasteFromClipboard={pasteFromClipboard} busy={busy} scriptLimit={scriptLimit} />
@@ -917,6 +928,52 @@ function GenerationReadiness({ script, selectedAvatar, selectedVoice, systemConf
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function GenerationQualityTips({ selectedAvatar, selectedVoice, backgroundConfig, backgroundImageUrl, audioSyncOffsetMs }) {
+  const imageDriven = Boolean(selectedAvatar && !selectedAvatar.providerAvatarId);
+  const keepOriginal = backgroundConfig === '保留原图背景';
+  const customBackground = backgroundConfig === '自定义背景' && Boolean(backgroundImageUrl);
+  const clonedVoice = Boolean(selectedVoice?.providerVoiceId);
+  const checks = [
+    {
+      label: imageDriven ? '图片驱动' : '官方 Avatar',
+      ok: true,
+      helper: imageDriven ? '建议正脸、光线均匀、嘴部无遮挡' : '稳定性通常更好',
+    },
+    {
+      label: keepOriginal ? '保留原图背景' : customBackground ? '自定义背景' : '场景背景',
+      ok: keepOriginal || customBackground,
+      helper: keepOriginal ? '最自然，少抠图瑕疵' : customBackground ? '背景可控，依赖抠图质量' : '可快速测试，复杂边缘可能显假',
+    },
+    {
+      label: clonedVoice ? '克隆声音' : '默认声音',
+      ok: true,
+      helper: clonedVoice ? '使用当前 Voice ID' : '未选克隆音色时使用默认音色',
+    },
+    {
+      label: audioSyncOffsetMs ? `口型 ${Math.abs(audioSyncOffsetMs)}ms` : '未校准',
+      ok: true,
+      helper: audioSyncOffsetMs > 0 ? '音频延后，适合嘴巴偏慢' : audioSyncOffsetMs < 0 ? '音频提前，适合声音偏慢' : '如有偏移可再调整',
+    },
+  ];
+
+  return (
+    <div className="mb-4 grid gap-2 rounded-2xl border border-slate-200 bg-white p-3 md:grid-cols-4">
+      {checks.map((check) => {
+        const Icon = check.ok ? ShieldCheck : AlertCircle;
+        return (
+          <div key={check.label} className="flex items-start gap-2 rounded-xl bg-slate-50 px-3 py-2">
+            <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${check.ok ? 'text-emerald-600' : 'text-amber-600'}`} />
+            <div className="min-w-0">
+              <div className="text-xs font-black text-slate-800">{check.label}</div>
+              <div className="mt-0.5 text-[11px] leading-4 text-slate-500">{check.helper}</div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1127,7 +1184,7 @@ function SettingsPanel({
               {backgroundImageUrl ? (
                 <button className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-500" type="button" onClick={() => {
                   setBackgroundImageUrl('');
-                  setBackgroundConfig('简约直播间');
+                  setBackgroundConfig('保留原图背景');
                 }}>
                   移除
                 </button>
@@ -1212,7 +1269,7 @@ function CostEstimateCard({ estimate }) {
   );
 }
 
-function GenerationConfirmModal({ estimate, script, avatar, voice, systemConfig, backgroundConfig, busy, onConfirm, onClose }) {
+function GenerationConfirmModal({ estimate, script, avatar, voice, systemConfig, backgroundConfig, backgroundImageUrl, audioSyncOffsetMs, busy, onConfirm, onClose }) {
   const hasChineseScript = /[\u3400-\u9fff]/.test(script);
   const likelyEnglishVoice = /english|en[-_]?/i.test(voice?.language || '');
   const avatarSource = avatar?.providerAvatarId ? '库内 HeyGen Avatar ID' : '上传图片驱动';
@@ -1244,7 +1301,12 @@ function GenerationConfirmModal({ estimate, script, avatar, voice, systemConfig,
           <InfoTile
             label="背景"
             value={backgroundConfig || '简约直播间'}
-            helper={backgroundConfig === '保留原图背景' ? '不抠图换背景' : backgroundConfig === '简约直播间' ? '使用内置场景背景' : '会传给 HeyGen 背景设置'}
+            helper={backgroundConfig === '保留原图背景' ? '不抠图换背景' : backgroundImageUrl ? '使用上传背景图' : backgroundConfig === '简约直播间' ? '使用内置场景背景' : '会传给 HeyGen 背景设置'}
+          />
+          <InfoTile
+            label="口型校准"
+            value={audioSyncOffsetMs ? `${Math.abs(audioSyncOffsetMs)}ms` : '不校准'}
+            helper={audioSyncOffsetMs > 0 ? '音频延后' : audioSyncOffsetMs < 0 ? '音频提前' : '直接使用 HeyGen 原片'}
           />
         </div>
 
