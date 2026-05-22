@@ -483,8 +483,9 @@ app.post('/api/voices', upload.single('sample'), asyncHandler(async (req, res) =
   const userId = await currentUserId(req);
   requireFields(req.body, ['name', 'gender', 'language', 'style']);
   const providerVoiceId = req.body.providerVoiceId?.trim() || '';
+  const requestedProvider = req.body.provider ? normalizeProviderName(req.body.provider) : '';
   const sampleUrl = fileUrl(req.file) || req.body.sampleUrl || '';
-  if (!sampleUrl && !providerVoiceId) return res.status(400).json({ error: '请上传声音样本文件或填写 providerVoiceId' });
+  if (!sampleUrl && !providerVoiceId) return res.status(400).json({ error: '请上传声音样本文件或填写外部声音 ID' });
   const shouldClone = parseBool(req.body.clone);
   if (shouldClone && req.file?.size > 10 * 1024 * 1024) {
     return res.status(400).json({ error: '声音克隆样本建议不超过 10MB，请上传 10-30 秒干净人声' });
@@ -502,7 +503,7 @@ app.post('/api/voices', upload.single('sample'), asyncHandler(async (req, res) =
       style: req.body.style.trim(),
       sampleUrl,
       duration: req.body.duration || '00:15',
-      provider: req.body.provider || (providerVoiceId ? providerName : (shouldClone ? providerName : 'mock')),
+      provider: requestedProvider || (providerVoiceId ? providerName : (shouldClone ? providerName : 'mock')),
       providerVoiceId: providerVoiceId || null,
       status: providerVoiceId ? 'ready' : (shouldClone ? 'pending' : 'ready'),
       isDefault: (providerVoiceId || !shouldClone) && parseBool(req.body.isDefault),
@@ -555,6 +556,7 @@ app.put('/api/voices/:id', upload.single('sample'), asyncHandler(async (req, res
   const userId = await currentUserId(req);
   const existing = await prisma.voice.findFirst({ where: { id: req.params.id, userId } });
   if (!existing) return res.status(404).json({ error: '声音不存在' });
+  const requestedProvider = req.body.provider ? normalizeProviderName(req.body.provider) : '';
   const providerVoiceId = req.body.providerVoiceId !== undefined ? (req.body.providerVoiceId.trim() || null) : existing.providerVoiceId;
   const sampleUrl = fileUrl(req.file) || req.body.sampleUrl || existing.sampleUrl;
   if (parseBool(req.body.isDefault)) await prisma.voice.updateMany({ where: { userId }, data: { isDefault: false } });
@@ -569,7 +571,7 @@ app.put('/api/voices/:id', upload.single('sample'), asyncHandler(async (req, res
       style: req.body.style?.trim() || existing.style,
       sampleUrl,
       duration: req.body.duration || existing.duration,
-      provider: req.body.provider || existing.provider,
+      provider: requestedProvider || existing.provider,
       providerVoiceId,
       status: shouldClone ? 'pending' : (req.body.status || (providerVoiceId ? 'ready' : existing.status)),
       isDefault: shouldClone ? false : (parseBool(req.body.isDefault) || (existing.isDefault && req.body.isDefault === undefined)),
