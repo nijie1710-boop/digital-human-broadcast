@@ -821,7 +821,7 @@ app.post('/api/jobs', asyncHandler(async (req, res) => {
     avatarId: avatar.id,
     voiceId: voice.id,
     subtitleStyle: req.body.subtitleStyle || '关键词高亮',
-    backgroundConfig: req.body.backgroundConfig || '简约直播间',
+    backgroundConfig: req.body.backgroundConfig || '保留原图背景',
     backgroundImageUrl: req.body.backgroundImageUrl || null,
     audioSyncOffsetMs: Number.parseInt(req.body.audioSyncOffsetMs || '0', 10) || 0,
     introOutroConfig: req.body.introOutroConfig || '无片头片尾',

@@ -367,6 +367,10 @@ function App() {
       setToast('本地图片驱动 HeyGen 需要 PUBLIC_BASE_URL 公网地址，请使用 Cloudflare Tunnel/ngrok 或部署到服务器。');
       return false;
     }
+    if (isHeyGenMode(systemConfig) && backgroundConfig === '自定义背景' && !backgroundImageUrl) {
+      setToast('已选择自定义背景，请先上传背景图，或改为保留原图背景。');
+      return false;
+    }
     if (systemConfig.provider === 'aliyun' && systemConfig.aliyun?.videoMode === 'videoretalk' && !selectedAvatar?.sourceVideo) {
       setToast('VideoRetalk 模式需要先给数字人上传基础视频');
       setActiveView('avatars');
@@ -422,6 +426,13 @@ function App() {
     const text = confirmGeneration?.text || script.trim();
     setConfirmGeneration(null);
     await createGenerationJob(text);
+  }
+
+  function applyRecommendedHeyGenSettings() {
+    setBackgroundConfig('保留原图背景');
+    setBackgroundImageUrl('');
+    setAudioSyncOffsetMs(200);
+    setToast('已套用推荐配置：保留原图背景 + 音频延后 200ms');
   }
 
   function applyTemplate(template) {
@@ -480,6 +491,7 @@ function App() {
           setBackgroundImageUrl={setBackgroundImageUrl}
           audioSyncOffsetMs={audioSyncOffsetMs}
           setAudioSyncOffsetMs={setAudioSyncOffsetMs}
+          applyRecommendedHeyGenSettings={applyRecommendedHeyGenSettings}
           introOutroConfig={introOutroConfig}
           setIntroOutroConfig={setIntroOutroConfig}
           busy={busy}
@@ -528,6 +540,7 @@ function App() {
     backgroundConfig,
     backgroundImageUrl,
     audioSyncOffsetMs,
+    applyRecommendedHeyGenSettings,
     busy,
     introOutroConfig,
     jobs,
@@ -695,6 +708,7 @@ function CreateVideoPage({
   setBackgroundImageUrl,
   audioSyncOffsetMs,
   setAudioSyncOffsetMs,
+  applyRecommendedHeyGenSettings,
   introOutroConfig,
   setIntroOutroConfig,
   busy,
@@ -1034,6 +1048,7 @@ function SettingsPanel({
   setBackgroundImageUrl,
   audioSyncOffsetMs,
   setAudioSyncOffsetMs,
+  applyRecommendedHeyGenSettings,
   introOutroConfig,
   setIntroOutroConfig,
   handleGenerate,
@@ -1150,7 +1165,14 @@ function SettingsPanel({
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
-        <h3 className="mb-3 font-black text-slate-900">视频设置</h3>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h3 className="font-black text-slate-900">视频设置</h3>
+          {heygen ? (
+            <button className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-700" type="button" onClick={applyRecommendedHeyGenSettings}>
+              推荐配置
+            </button>
+          ) : null}
+        </div>
         <SelectInput
           label={heygen ? '字幕样式（HeyGen 暂未接入）' : '字幕样式'}
           value={subtitleStyle}
