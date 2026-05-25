@@ -20,6 +20,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     allowedHosts,
+    hmr: { port: Number(process.env.PORT || 5173) + 10000 },
   },
   preview: {
     allowedHosts,

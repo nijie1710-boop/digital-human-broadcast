@@ -9,7 +9,6 @@ import { JobRunner } from './jobs/job-runner.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
-const port = Number(process.env.PORT || 5173);
 const isProduction = process.env.NODE_ENV === 'production';
 const DEFAULT_USER_ID = 'default-user';
 const ALIYUN_SCRIPT_LIMIT = 120;
@@ -18,6 +17,7 @@ const ALIYUN_SHORT_SCRIPT_MESSAGE = '阿里真实数字人模式下，首版建�
 const VIDEORETALK_SHORT_SCRIPT_MESSAGE = 'VideoRetalk 首版建议每段文案不超过 120 字，长文案后续使用分段生成';
 
 loadDotEnv();
+const port = Number(process.env.PORT || 5173);
 ensureLocalFiles();
 
 const { PrismaClient } = await import('@prisma/client');
@@ -926,7 +926,12 @@ if (isProduction) {
   const { createServer: createViteServer } = await import('vite');
   const vite = await createViteServer({
     root: rootDir,
-    server: { middlewareMode: true, host: '0.0.0.0', allowedHosts: devAllowedHosts() },
+    server: {
+      middlewareMode: true,
+      host: '0.0.0.0',
+      allowedHosts: devAllowedHosts(),
+      hmr: { port: port + 10000 },
+    },
     appType: 'spa',
   });
   app.use(vite.middlewares);

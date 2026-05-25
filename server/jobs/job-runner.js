@@ -314,13 +314,9 @@ export class JobRunner {
 
   async ensureProject(job) {
     const existing = await this.prisma.project.findUnique({ where: { jobId: job.id } });
-    const data = {
-      userId: job.userId,
+    const projectFields = {
       title: job.title,
       script: job.script,
-      avatarId: job.avatarId,
-      voiceId: job.voiceId,
-      jobId: job.id,
       videoUrl: job.resultVideoUrl || job.videoUrl,
       coverUrl: job.coverUrl || job.avatar.previewImage,
       duration: job.duration || estimateDuration(job.script),
@@ -330,12 +326,18 @@ export class JobRunner {
     if (existing) {
       return this.prisma.project.update({
         where: { id: existing.id },
-        data,
+        data: projectFields,
       });
     }
 
     return this.prisma.project.create({
-      data,
+      data: {
+        ...projectFields,
+        userId: job.userId,
+        avatarId: job.avatarId,
+        voiceId: job.voiceId,
+        jobId: job.id,
+      },
     });
   }
 
